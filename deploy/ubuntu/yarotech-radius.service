@@ -1,0 +1,32 @@
+[Unit]
+Description=Yarotech Radius Django API
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=yarotech
+Group=www-data
+WorkingDirectory=/opt/yarotech-radius/backend
+EnvironmentFile=/etc/yarotech-radius/backend.env
+Environment=DJANGO_SETTINGS_MODULE=config.production_settings
+RuntimeDirectory=yarotech-radius
+RuntimeDirectoryMode=0750
+ExecStart=/opt/yarotech-radius/backend/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --threads 2 --timeout 30 --graceful-timeout 30 --access-logfile - --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=35
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

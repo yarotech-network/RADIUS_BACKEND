@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+
+venv/
+venv-*/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+staticfiles/
+media/
+schema.yml
+*.log

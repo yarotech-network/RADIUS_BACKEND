@@ -1,0 +1,17 @@
+[Unit]
+Description=Yarotech Radius scheduled maintenance
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=yarotech
+Group=www-data
+WorkingDirectory=/opt/yarotech-radius/backend
+EnvironmentFile=/etc/yarotech-radius/backend.env
+Environment=DJANGO_SETTINGS_MODULE=config.production_settings
+ExecStart=/opt/yarotech-radius/backend/venv/bin/python manage.py expire_vouchers
+ExecStart=/opt/yarotech-radius/backend/venv/bin/python manage.py expire_subscriptions
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

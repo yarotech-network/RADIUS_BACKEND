@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Yarotech Radius maintenance every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+RandomizedDelaySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
