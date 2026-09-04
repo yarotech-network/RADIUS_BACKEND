@@ -1,12 +1,12 @@
 .env
 .env.*
 !.env.example
-DJANGO_BACKEND_PROMPTS.md
 
 venv/
 venv-*/
 .venv/
 docs/
+DJANGO_BACKEND_PROMPTS.md
 
 __pycache__/
 *.py[cod]
