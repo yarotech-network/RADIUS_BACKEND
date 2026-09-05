@@ -1,0 +1,62 @@
+Backend API validation - 2026-09-05
+Scope: yarotech-radius-backend only. No frontend or production integration.
+
+python -m pytest -q -p no:cacheprovider --reuse-db
+PASS: 158 passed, 1 skipped in 27.79s.
+Skipped: opt-in password-reset browser test, outside this API-only task.
+Database: isolated PostgreSQL test_yarotech_radius, PostgreSQL 18.6 / READ COMMITTED.
+
+python manage.py spectacular --file openapi-v1.yaml --validate --fail-on-warn --settings=config.test_settings
+PASS: exit 0, no warnings/errors.
+Schema paths: 93; HTTP operations: 135.
+Schema SHA256: a08400410cf61479758239d4d439de81246bef76e02e1931b0f0042f519f472e
+
+python manage.py makemigrations --check --dry-run
+PASS: No changes detected.
+python manage.py migrate --check
+PASS: no pending local migrations.
+python manage.py check
+PASS: System check identified no issues (0 silenced).
+python -m pip check
+PASS: No broken requirements found.
+python -m compileall -q apps config
+PASS: exit 0.
+git diff --check
+PASS: exit 0 with informational Windows LF/CRLF conversion warnings.
+
+Migration verification:
+PASS: pg_dump custom-format local backup and pg_restore archive validation.
+PASS: restore to a temporary database; apply 19 migrations; rollback; re-apply.
+PASS: original five accounts preserved; temporary database removed.
+PASS: apply verified migrations to local yarotech_radius with lock/statement timeouts.
+PASS: unchanged record counts across 12 existing business models.
+Backup: C:\Users\dell\AppData\Local\Temp\yarotech-api-backup-i2pd95x6\before-api-migrations.dump
+Previous local environment configuration saved in that private directory.
+
+Worker CLI discovery/safety checks:
+python manage.py process_router_operations --limit 0
+PASS: Processed 0 router operations.
+python manage.py process_payment_deliveries --limit 0
+PASS: Processed 0 payment deliveries.
+Real jobs were exercised only in tests with fake SSH/SMTP boundaries.
+
+Actual localhost HTTP checks against normal Django settings:
+PASS: /health/live/ and /health/ready/: 200.
+PASS: unauthenticated /api/v1/routers/: 401 with problem envelope.
+PASS: unknown API route: 404 with problem envelope.
+PASS: authenticated routers, plans, tenant profile, dashboard statistics,
+      payment recovery, audit events and live users: 200.
+PASS: authenticated HTTP recheck after signing-key change: 200, no key-length warning.
+Temporary WSGI servers stopped after checks; HTTP checks did not change business records.
+
+Local configuration:
+Replaced a short Django/JWT signing key with a cryptographically random key.
+Preserved the Fernet encryption key; backed up the previous local environment.
+Existing local login tokens and reset links need reissuing.
+Used process-local DEBUG=False to override inherited invalid DEBUG=release.
+
+Limits:
+No real Paystack charge/verification, customer email delivery, SSH provisioning,
+RouterOS telemetry, RADIUS device authentication or disconnect was performed.
+No production-scale load, monitoring, deployment, or frontend compatibility claim.
+No commits or pushes were made. See API_IMPLEMENTATION_REPORT.md for scope and readiness.

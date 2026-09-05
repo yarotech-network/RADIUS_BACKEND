@@ -10,30 +10,32 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.CharField(read_only=True)
+    tenant_id = serializers.IntegerField(source="membership.tenant_id", read_only=True, default=None)
     tenant_name = serializers.CharField(source="membership.tenant.name", read_only=True, default=None)
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "phone", "role", "tenant_name"]
+        fields = ["id", "username", "email", "first_name", "last_name", "phone", "role", "tenant_name", "tenant_id"]
         read_only_fields = ["id", "role", "tenant_name"]
 
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
 class RegisterSerializer(serializers.Serializer):
-    username = serializers.CharField(min_length=3)
+    username = serializers.CharField(min_length=3, max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(
         min_length=8,
         write_only=True,
+        trim_whitespace=False,
         validators=[validate_password],
     )
-    password_confirm = serializers.CharField(write_only=True)
-    tenant_name = serializers.CharField(min_length=2)
-    phone = serializers.CharField(min_length=10)
+    password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
+    tenant_name = serializers.CharField(min_length=2, max_length=200)
+    phone = serializers.CharField(min_length=10, max_length=20)
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
@@ -41,7 +43,7 @@ class RegisterSerializer(serializers.Serializer):
         return value
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("Email already registered.")
         return value
 
@@ -49,6 +51,8 @@ class RegisterSerializer(serializers.Serializer):
         slug = slugify(value)
         if not slug:
             raise serializers.ValidationError("Tenant name must contain letters or numbers.")
+        if len(slug) > 50:
+            raise serializers.ValidationError("Tenant name produces a slug longer than 50 characters.")
         if Tenant.objects.filter(slug=slug).exists():
             raise serializers.ValidationError("A tenant with this name already exists.")
         return value
@@ -87,8 +91,8 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
-    password = serializers.CharField(min_length=8, write_only=True)
-    password_confirm = serializers.CharField(write_only=True)
+    password = serializers.CharField(min_length=8, write_only=True, trim_whitespace=False)
+    password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
 
     def validate(self, data):
         if data["password"] != data["password_confirm"]:
@@ -97,9 +101,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    old_password = serializers.CharField()
+    old_password = serializers.CharField(write_only=True, trim_whitespace=False)
     new_password = serializers.CharField(
         min_length=8,
+        write_only=True, trim_whitespace=False,
         validators=[validate_password],
     )
 

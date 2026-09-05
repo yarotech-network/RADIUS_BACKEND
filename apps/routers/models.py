@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
+from .operation_models import RouterOperation  # noqa: F401
 
 
 class NASDevice(models.Model):
@@ -27,12 +28,12 @@ class NASDevice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     ip_address = models.GenericIPAddressField()
-    nas_secret = models.CharField(max_length=255)
+    nas_secret = models.TextField()
     wireguard_ip = models.GenericIPAddressField(blank=True, null=True)
     wireguard_public_key = models.CharField(max_length=255, blank=True)
     wireguard_port = models.PositiveIntegerField(default=51820)
     routeros_username = models.CharField(max_length=100, blank=True)
-    routeros_password_encrypted = models.CharField(max_length=255, blank=True)
+    routeros_password_encrypted = models.TextField(blank=True)
     location = models.CharField(max_length=200, blank=True)
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="routers")
     onboarding_state = models.CharField(max_length=30, choices=ONBOARDING_STATES, default="pending")

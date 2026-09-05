@@ -21,10 +21,12 @@ INSTALLED_APPS = [
     # Third party
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
     "drf_spectacular",
     # Local apps
+    "apps.core",
     "apps.accounts",
     "apps.tenants",
     "apps.vouchers",
@@ -38,6 +40,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "apps.core.middleware.ApiErrorEnvelopeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -101,6 +104,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # === REST Framework ===
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
@@ -127,7 +131,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "CHECK_REVOKE_TOKEN": True,
 }
@@ -139,9 +143,21 @@ CORS_ALLOWED_ORIGINS = config(
     cast=Csv(),
 )
 CORS_ALLOW_CREDENTIALS = True
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key", "x-tenant-id"]
+CORS_EXPOSE_HEADERS = ["Idempotency-Replayed", "Retry-After"]
 
 # === DRF Spectacular ===
 SPECTACULAR_SETTINGS = {
+    "POSTPROCESSING_HOOKS": ["drf_spectacular.hooks.postprocess_schema_enums", "apps.core.schema.annotate_api_errors_and_commands"],
+    "ENUM_NAME_OVERRIDES": {
+        "OnboardingStateEnum": "apps.routers.models.NASDevice.ONBOARDING_STATES",
+        "AgentStatusEnum": "apps.agents.models.AgentProfile.STATUS_CHOICES",
+        "VoucherStatusEnum": "apps.vouchers.models.Voucher.STATUS_CHOICES",
+        "PaymentStatusEnum": "apps.vouchers.models.PaymentTransaction.STATUS_CHOICES",
+        "FundingStatusEnum": "apps.agents.models.AgentWalletFundingPayment.STATUS_CHOICES",
+        "SubscriptionStatusEnum": "apps.subscriptions.models.TenantSubscription.STATUS_CHOICES",
+    },
     "TITLE": "YAROTECH RADIUS API",
     "DESCRIPTION": "Multi-tenant RADIUS hotspot management API",
     "VERSION": "1.0.0",
@@ -189,6 +205,7 @@ EMAIL_BACKEND = config(
     default="django.core.mail.backends.console.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@yarotech.local")
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
 PASSWORD_RESET_FRONTEND_URL = config(
     "PASSWORD_RESET_FRONTEND_URL",
     default="http://localhost:5173/reset-password?uid={uid}&token={token}",

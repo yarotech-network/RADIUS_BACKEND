@@ -38,7 +38,7 @@ class DashboardTests(APITestCase):
     def test_live_users_filters_active_sessions_by_tenant_router_ips(self, sessions):
         self.router.wireguard_ip = "10.100.100.2"
         self.router.save(update_fields=["wireguard_ip"])
-        sessions.return_value = [SimpleNamespace(
+        sessions.return_value.order_by.return_value = [SimpleNamespace(
             radacctid=42,
             username="own",
             nasipaddress="10.0.0.1",

@@ -5,6 +5,7 @@ import json
 from django.db import transaction
 from django.http import JsonResponse
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -16,6 +17,7 @@ from apps.subscriptions.models import SubscriptionPayment
 from apps.subscriptions.services import SubscriptionService
 from .models import PaystackWebhookEvent
 from .services import get_paystack_secret, get_paystack_service
+from .recovery import fulfill_verified_voucher
 
 
 def _resolve_payment(reference):
@@ -64,11 +66,13 @@ def paystack_webhook(request, token):
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
+        return JsonResponse({"error": "Invalid event structure"}, status=400)
     event = payload.get("event")
     data = payload.get("data") or {}
     event_id = data.get("id")
     reference = data.get("reference")
-    if not event_id or not reference:
+    if not event_id or not isinstance(reference, str) or not reference or len(reference) > 100:
         return JsonResponse({"error": "Missing event identity"}, status=400)
 
     kind, payment = _resolve_payment(reference)
@@ -88,12 +92,16 @@ def paystack_webhook(request, token):
         return JsonResponse({"error": "Payment verification unavailable"}, status=503)
 
     if (
-        verified.get("status") != "success"
+        not isinstance(verified, dict)
+        or verified.get("status") != "success"
         or verified.get("reference") != reference
         or verified.get("amount") != payment.amount
         or verified.get("currency") != "NGN"
     ):
         return JsonResponse({"error": "Payment verification mismatch"}, status=400)
+
+    if kind == "voucher":
+        PaymentTransaction.objects.filter(pk=payment.pk).update(verified_at=timezone.now())
 
     try:
         with transaction.atomic():
@@ -105,19 +113,9 @@ def paystack_webhook(request, token):
                 return JsonResponse({"status": "duplicate"}, status=200)
 
             if kind == "voucher":
-                locked = PaymentTransaction.objects.select_for_update().get(pk=payment.pk)
-                if not locked.voucher_id:
-                    vouchers = VoucherService.generate_vouchers(
-                        tenant=locked.tenant,
-                        plan_id=locked.plan_id,
-                        quantity=1,
-                        source="customer",
-                    )
-                    locked.voucher = vouchers[0]
-                locked.status = "success"
+                locked = fulfill_verified_voucher(payment, verified)
                 locked.paystack_reference = str(event_id)
-                locked.paid_at = parse_datetime(verified.get("paid_at", ""))
-                locked.save(update_fields=["voucher", "status", "paystack_reference", "paid_at"])
+                locked.save(update_fields=["paystack_reference"])
             elif kind == "wallet":
                 AgentService.complete_wallet_funding(payment)
             else:

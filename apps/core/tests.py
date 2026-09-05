@@ -7,6 +7,20 @@ from drf_spectacular.generators import SchemaGenerator
 
 
 class OpenApiContractTests(SimpleTestCase):
+    def test_new_command_and_pagination_schemas_match_wire_contract(self):
+        schema = SchemaGenerator().get_schema(request=None, public=True)
+        schemas = schema["components"]["schemas"]
+        self.assertIn("current_password", schemas["ReplaceSecrets"]["required"])
+        self.assertIn("expected_updated_at", schemas["ReplaceSecrets"]["required"])
+        self.assertIn("action", schemas["Provision"]["required"])
+        operation = schema["paths"]["/api/v1/routers/{id}/provisioning/"]["post"]
+        self.assertIn("202", operation["responses"])
+        self.assertIn("Idempotency-Key", [parameter["name"] for parameter in operation.get("parameters", [])])
+        for name, component in schemas.items():
+            if name.startswith("Paginated"):
+                self.assertIn("total_pages", component["properties"], name)
+                self.assertNotIn("next", component["properties"], name)
+
     def test_schema_contains_critical_public_and_authenticated_routes(self):
         schema = SchemaGenerator().get_schema(request=None, public=True)
 

@@ -6,6 +6,7 @@ from .serializers import InitializePaymentSerializer
 from apps.vouchers.models import PaymentTransaction
 from apps.vouchers.serializers import PaymentTransactionSerializer
 import secrets
+from apps.core.commands import idempotent
 
 
 class InitializePaymentView(APIView):
@@ -14,6 +15,7 @@ class InitializePaymentView(APIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = InitializePaymentSerializer
 
+    @idempotent
     def post(self, request):
         serializer = InitializePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

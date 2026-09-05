@@ -1,4 +1,5 @@
 from django.db import models
+from .delivery_models import PaymentDelivery  # noqa: F401
 
 
 class PaystackWebhookEvent(models.Model):

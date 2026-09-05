@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.vouchers.serializers import VoucherGenerateSerializer
 from .models import (
     AgentProfile, AgentWallet, AgentWalletFundingPayment,
     AgentVoucherAllocation, AgentCreditAccount,
@@ -28,6 +29,13 @@ class AgentWalletSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "agent", "balance", "updated_at"]
 
 
+class AgentFundingPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgentWalletFundingPayment
+        fields = ["id", "reference", "amount", "status", "created_at", "completed_at"]
+        read_only_fields = fields
+
+
 class AgentWalletFundingSerializer(serializers.Serializer):
     amount = serializers.IntegerField(min_value=50_000, help_text="Minimum \u20a6500")
 
@@ -42,6 +50,11 @@ class AgentWalletFundingSerializer(serializers.Serializer):
         return value
 
 
+class FundingCheckoutSerializer(serializers.Serializer):
+    authorization_url = serializers.URLField()
+    reference = serializers.CharField()
+
+
 class AgentVoucherAllocationSerializer(serializers.ModelSerializer):
     voucher_username = serializers.CharField(source="voucher.username", read_only=True)
 
@@ -53,6 +66,14 @@ class AgentVoucherAllocationSerializer(serializers.ModelSerializer):
         ]
 
 
+class AgentGeneratedVouchersSerializer(serializers.Serializer):
+    vouchers = AgentVoucherAllocationSerializer(many=True)
+
+
+class AgentVoucherGenerateSerializer(VoucherGenerateSerializer):
+    quantity = serializers.IntegerField(min_value=1, max_value=100, default=1)
+
+
 class AgentStatsSerializer(serializers.Serializer):
     wallet_balance = serializers.IntegerField()
     vouchers_today = serializers.IntegerField()
@@ -62,4 +83,4 @@ class AgentStatsSerializer(serializers.Serializer):
 
 class AgentLoginSerializer(serializers.Serializer):
     username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)

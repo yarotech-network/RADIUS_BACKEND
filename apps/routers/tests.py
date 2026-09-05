@@ -42,6 +42,44 @@ PUBLIC_KEY_B = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
 
 
 class RouterApiAndStateTests(APITestCase):
+    @override_settings(WG_MANAGED_SUBNET="10.8.0.0/24")
+    def test_complete_frontend_form_fields_round_trip_without_secret_disclosure(self):
+        self.client.force_authenticate(self.manager)
+        payload = {
+            "name": "Form router", "ip_address": "192.0.2.40",
+            "nas_secret": "form-nas-secret", "location": "First floor",
+            "is_active": False, "wireguard_ip": "10.8.0.40",
+            "wireguard_public_key": PUBLIC_KEY_A, "wireguard_port": 51821,
+            "routeros_username": "operator", "routeros_password_encrypted": "form-password",
+        }
+        response = self.client.post(reverse("router-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        record = NASDevice.objects.get(pk=response.data["id"])
+        self.assertEqual(record.tenant, self.tenant_a)
+        for field in ("name", "ip_address", "location", "is_active", "wireguard_ip", "wireguard_public_key", "wireguard_port", "routeros_username"):
+            self.assertEqual(response.data[field], payload[field])
+        self.assertNotIn("nas_secret", response.data)
+        self.assertNotIn("routeros_password_encrypted", response.data)
+        self.assertEqual(secret_store.decrypt(record.nas_secret), "form-nas-secret")
+        self.assertEqual(secret_store.decrypt(record.routeros_password_encrypted), "form-password")
+        original_secret = record.nas_secret
+        original_password = record.routeros_password_encrypted
+        detail = reverse("router-detail", args=[record.pk])
+        updated = self.client.patch(detail, {"name": "Edited router", "wireguard_ip": None, "wireguard_public_key": "", "location": "", "is_active": True}, format="json")
+        self.assertEqual(updated.status_code, status.HTTP_200_OK, updated.data)
+        record.refresh_from_db()
+        self.assertEqual(record.nas_secret, original_secret)
+        self.assertEqual(record.routeros_password_encrypted, original_password)
+        self.assertIsNone(record.wireguard_ip)
+        self.assertEqual(record.wireguard_public_key, "")
+        self.assertTrue(record.is_active)
+        cleared = self.client.patch(detail, {"routeros_password_encrypted": ""}, format="json")
+        self.assertEqual(cleared.status_code, status.HTTP_400_BAD_REQUEST)
+        cleared = self.client.post(detail + "replace-secrets/", {"routeros_password_encrypted": "", "current_password": "StrongPass-4821", "expected_updated_at": record.updated_at.isoformat()}, format="json")
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK)
+        record.refresh_from_db()
+        self.assertEqual(record.routeros_password_encrypted, "")
+
     def setUp(self):
         cache.clear()
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")

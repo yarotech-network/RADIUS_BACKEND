@@ -11,9 +11,20 @@ class VoucherService:
     """Core voucher operations."""
 
     @staticmethod
+    def write_radius_credentials(voucher):
+        Radcheck.objects.create(username=voucher.username, attribute="Cleartext-Password", op=":=", value=voucher.password)
+        Radcheck.objects.create(username=voucher.username, attribute="Max-Days", op=":=", value=str(voucher.plan.duration_hours * 3600))
+        if voucher.plan.data_limit > 0:
+            Radcheck.objects.create(username=voucher.username, attribute="Max-Total-Octets", op=":=", value=str(voucher.plan.data_limit * 1024 * 1024))
+
+    @staticmethod
     @transaction.atomic
     def generate_vouchers(tenant, plan_id, quantity, prefix="", agent=None, source="admin"):
         """Generate vouchers and create RADIUS radcheck rows."""
+        if type(quantity) is not int or not 1 <= quantity <= 100:
+            raise ValueError("Quantity must be an integer between 1 and 100.")
+        if not tenant.is_active or (agent is not None and agent.tenant_id != tenant.pk):
+            raise ValueError("Invalid tenant or agent scope.")
         plan = InternetPlan.objects.get(id=plan_id, tenant=tenant, is_active=True)
         vouchers = []
 
@@ -34,26 +45,7 @@ class VoucherService:
                 device_limit=1,
             )
 
-            # Create radcheck rows for FreeRADIUS
-            Radcheck.objects.create(
-                username=username,
-                attribute="Cleartext-Password",
-                op=":=",
-                value=password,
-            )
-            Radcheck.objects.create(
-                username=username,
-                attribute="Max-Days",
-                op=":=",
-                value=str(plan.duration_hours * 3600),  # Convert to seconds
-            )
-            if plan.data_limit > 0:
-                Radcheck.objects.create(
-                    username=username,
-                    attribute="Max-Total-Octets",
-                    op=":=",
-                    value=str(plan.data_limit * 1024 * 1024),  # Convert MB to bytes
-                )
+            VoucherService.write_radius_credentials(voucher)
 
             vouchers.append(voucher)
 
@@ -164,18 +156,8 @@ class RadiusService:
         from .models import Radacct
         query = Radacct.objects.filter(acctstoptime__isnull=True)
         if tenant:
-            # Filter by NAS IP belonging to tenant's routers
-            from apps.routers.models import NASDevice
-            routers = NASDevice.objects.filter(tenant=tenant).values_list(
-                "ip_address", "wireguard_ip"
-            )
-            router_ips = {
-                str(address)
-                for addresses in routers
-                for address in addresses
-                if address is not None
-            }
-            query = query.filter(nasipaddress__in=router_ips)
+            from apps.routers.selectors import tenant_radius_addresses
+            query = query.filter(nasipaddress__in=tenant_radius_addresses(tenant))
         return query
 
     @staticmethod

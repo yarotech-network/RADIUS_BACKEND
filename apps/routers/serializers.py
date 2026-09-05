@@ -10,6 +10,9 @@ from .provisioners import (
 
 
 class NASDeviceSerializer(serializers.ModelSerializer):
+    nas_secret = serializers.CharField(max_length=255, write_only=True, trim_whitespace=False)
+    routeros_password_encrypted = serializers.CharField(max_length=255, write_only=True, required=False, allow_blank=True, trim_whitespace=False)
+    wireguard_port = serializers.IntegerField(min_value=1, max_value=65535, required=False)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
 
     class Meta:
@@ -34,6 +37,16 @@ class NASDeviceSerializer(serializers.ModelSerializer):
             return validate_wireguard_public_key(value)
         except WireGuardConfigurationError as exc:
             raise serializers.ValidationError(str(exc)) from exc
+
+    def validate_nas_secret(self, value):
+        if value.startswith("enc:v1:"):
+            raise serializers.ValidationError("Provide a plaintext replacement, not stored ciphertext.")
+        return value
+
+    def validate_routeros_password_encrypted(self, value):
+        if value.startswith("enc:v1:"):
+            raise serializers.ValidationError("Provide a plaintext replacement, not stored ciphertext.")
+        return value
 
     def validate_wireguard_ip(self, value):
         if value is None:
@@ -110,3 +123,7 @@ class ProvisioningRequestSerializer(serializers.Serializer):
 class RouterRadiusTestSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=253)
     password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)
+
+
+class RouterTransitionSerializer(serializers.Serializer):
+    to_state = serializers.ChoiceField(choices=NASDevice.ONBOARDING_STATES)

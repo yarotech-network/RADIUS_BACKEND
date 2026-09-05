@@ -4,6 +4,12 @@ from apps.routers.secret_store import secret_store
 
 
 class TenantWhatsAppRouteSerializer(serializers.ModelSerializer):
+    access_token_encrypted = serializers.CharField(max_length=500, write_only=True, trim_whitespace=False)
+
+    def validate_access_token_encrypted(self, value):
+        if value.startswith("enc:v1:"):
+            raise serializers.ValidationError("Provide a plaintext access token, not stored ciphertext.")
+        return value
     class Meta:
         model = TenantWhatsAppRoute
         fields = [

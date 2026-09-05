@@ -1,4 +1,6 @@
+from apps.core.api import tenant_for
 import secrets
+from apps.core.commands import idempotent
 
 from rest_framework import viewsets, generics, permissions, status
 from rest_framework.exceptions import NotFound
@@ -29,7 +31,7 @@ class TenantSubscriptionView(generics.RetrieveAPIView):
     def get_object(self):
         try:
             return TenantSubscription.objects.select_related("plan").get(
-                tenant=self.request.user.membership.tenant
+                tenant=tenant_for(self.request)
             )
         except TenantSubscription.DoesNotExist as exc:
             raise NotFound("Subscription not found.") from exc
@@ -39,11 +41,12 @@ class SubscriptionCheckoutView(APIView):
     permission_classes = [IsTenantOwner]
     serializer_class = SubscriptionCheckoutSerializer
 
+    @idempotent
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         plan = serializer.validated_data["plan"]
-        tenant = request.user.membership.tenant
+        tenant = tenant_for(request)
         reference = f"subscription-{secrets.token_hex(12)}"
         payment = SubscriptionPayment.objects.create(
             tenant=tenant,
@@ -85,5 +88,5 @@ class SubscriptionPaymentStatusView(generics.RetrieveAPIView):
         if getattr(self, "swagger_fake_view", False):
             return SubscriptionPayment.objects.none()
         return SubscriptionPayment.objects.filter(
-            tenant=self.request.user.membership.tenant
+            tenant=tenant_for(self.request)
         ).select_related("plan", "subscription")

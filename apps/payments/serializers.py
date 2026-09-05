@@ -6,7 +6,7 @@ from apps.vouchers.models import InternetPlan
 class InitializePaymentSerializer(serializers.Serializer):
     plan_id = serializers.PrimaryKeyRelatedField(
         source="plan",
-        queryset=InternetPlan.objects.filter(is_active=True),
+        queryset=InternetPlan.objects.filter(is_active=True, tenant__is_active=True),
     )
     email = serializers.EmailField()
     name = serializers.CharField(max_length=200, required=False, allow_blank=True)

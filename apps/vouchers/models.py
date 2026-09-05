@@ -79,6 +79,7 @@ class Voucher(models.Model):
 
 
 class PaymentTransaction(models.Model):
+    verified_at = models.DateTimeField(null=True, blank=True)
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("success", "Success"),

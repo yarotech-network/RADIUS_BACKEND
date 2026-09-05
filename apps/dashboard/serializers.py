@@ -8,6 +8,11 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_agents = serializers.IntegerField()
     total_routers = serializers.IntegerField()
     active_routers = serializers.IntegerField()
+    currency = serializers.CharField()
+    amount_unit = serializers.CharField()
+    observed_at = serializers.DateTimeField()
+    pending_payments = serializers.IntegerField()
+    paid_unfulfilled_payments = serializers.IntegerField()
 
 
 class LiveUserSerializer(serializers.Serializer):
@@ -19,11 +24,17 @@ class LiveUserSerializer(serializers.Serializer):
     bytes_in = serializers.IntegerField()
     bytes_out = serializers.IntegerField()
     connected_at = serializers.DateTimeField(allow_null=True)
+    router_id = serializers.UUIDField(allow_null=True)
+    router_name = serializers.CharField(allow_null=True)
 
 
 class LiveUsersResponseSerializer(serializers.Serializer):
     users = LiveUserSerializer(many=True)
     count = serializers.IntegerField()
+    current_page = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    observed_at = serializers.DateTimeField()
+    source = serializers.CharField()
 
 
 class DisconnectSessionResponseSerializer(serializers.Serializer):

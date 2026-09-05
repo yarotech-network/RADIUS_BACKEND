@@ -17,6 +17,7 @@ import hmac
 import hashlib
 import ipaddress
 import time
+from django.utils import timezone
 
 
 def _client_is_allowed(remote_address, allowed_networks):
@@ -72,7 +73,10 @@ class ProvisioningAgentEndpoint(APIView):
             return Response({"error": "Invalid key"}, status=401)
 
         # Verify signature
-        payload = request.body.decode()
+        try:
+            payload = request.body.decode()
+        except UnicodeDecodeError:
+            return Response({"error": "Invalid request encoding"}, status=400)
         message = f"{timestamp}.{payload}"
         computed = hmac.new(matching_key.encode(), message.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, computed):
@@ -132,6 +136,9 @@ class ProvisioningAgentEndpoint(APIView):
         try:
             with transaction.atomic():
                 router = NASDevice.objects.select_for_update().get(pk=router.pk)
+                if router.deployment_status == "deploying" or router.operations.filter(status__in=["pending", "running"]).exists():
+                    request_record.delete()
+                    return Response({"error": "A router operation is already pending"}, status=409)
                 if action == "provision_wireguard_peer":
                     router.wireguard_ip = data["wireguard_ip"]
                     router.wireguard_public_key = data["public_key"]
@@ -179,6 +186,7 @@ class ProvisioningAgentEndpoint(APIView):
                 check_type="wireguard_peer",
                 defaults={
                     "passed": deployed,
+                    "checked_at": timezone.now(),
                     "details": {"request_id": str(request_id), "action": action},
                 },
             )

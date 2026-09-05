@@ -12,6 +12,7 @@ urlpatterns = [
     path("health/ready/", readiness, name="health-ready"),
     path("admin/", admin.site.urls),
     # API v1
+    path("api/v1/", include("apps.core.urls")),
     path("api/v1/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.tenants.urls")),
     path("api/v1/", include("apps.vouchers.urls")),

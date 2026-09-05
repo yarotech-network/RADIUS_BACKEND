@@ -1,3 +1,4 @@
+from apps.core.api import tenant_for
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,11 +18,16 @@ from apps.agents.models import AgentProfile
 from apps.core.permissions import IsTenantManager
 from apps.routers.radius_client import RadiusError
 from apps.routers.secret_store import secret_store
+from apps.core.pagination import StandardResultsPagination
+from apps.core.commands import idempotent
+from rest_framework.exceptions import ValidationError
+from django.core.exceptions import ValidationError as ModelValidationError
+from apps.routers.selectors import tenant_radius_addresses
 
 class DashboardStatsView(APIView):
     serializer_class = DashboardStatsSerializer
     def get(self, request):
-        tenant = request.user.membership.tenant
+        tenant = tenant_for(request)
         today = timezone.now().date()
         month_start = today.replace(day=1)
 
@@ -36,6 +42,11 @@ class DashboardStatsView(APIView):
             "active_routers": NASDevice.objects.filter(
                 tenant=tenant, onboarding_state="active"
             ).count(),
+            "currency": "NGN",
+            "amount_unit": "kobo",
+            "observed_at": timezone.now(),
+            "pending_payments": PaymentTransaction.objects.filter(tenant=tenant, status="pending").count(),
+            "paid_unfulfilled_payments": PaymentTransaction.objects.filter(tenant=tenant, verified_at__isnull=False, voucher__isnull=True).count(),
         })
 
 
@@ -45,23 +56,31 @@ class LiveUsersView(APIView):
         from apps.vouchers.models import Radacct
         from apps.routers.models import NASDevice
 
-        tenant = request.user.membership.tenant
-        router_addresses = NASDevice.objects.filter(tenant=tenant).values_list(
-            "ip_address", "wireguard_ip"
-        )
-        router_ips = {
-            str(address)
-            for addresses in router_addresses
-            for address in addresses
-            if address is not None
-        }
+        tenant = tenant_for(request)
+        router_ips = tenant_radius_addresses(tenant)
         sessions = Radacct.objects.filter(
             nasipaddress__in=router_ips,
             acctstoptime__isnull=True,
-        )
+        ).order_by("-radacctid")
+        if request.query_params.get("username"):
+            sessions = sessions.filter(username__icontains=request.query_params["username"])
+        if request.query_params.get("router"):
+            try:
+                router = NASDevice.objects.get(pk=request.query_params["router"], tenant=tenant)
+            except (NASDevice.DoesNotExist, ValueError, ModelValidationError):
+                raise ValidationError({"router": "Router not found."})
+            sessions = sessions.filter(nasipaddress__in=[ip for ip in (router.ip_address, router.wireguard_ip) if ip])
+        pagination = StandardResultsPagination()
+        page = pagination.paginate_queryset(sessions, request, view=self)
+        router_map = {}
+        for router in NASDevice.objects.filter(tenant=tenant).only("id", "name", "ip_address", "wireguard_ip"):
+            for address in (router.ip_address, router.wireguard_ip):
+                if address:
+                    router_map[str(address)] = router
 
         users = []
-        for session in sessions:
+        for session in page:
+            router = router_map.get(str(session.nasipaddress))
             users.append({
                 "session_id": session.radacctid,
                 "username": session.username,
@@ -71,29 +90,24 @@ class LiveUsersView(APIView):
                 "bytes_in": session.acctinputoctets,
                 "bytes_out": session.acctoutputoctets,
                 "connected_at": session.acctstarttime,
+                "router_id": str(router.pk) if router else None,
+                "router_name": router.name if router else None,
             })
 
-        return Response({"users": users, "count": len(users)})
+        return Response({"users": users, "count": pagination.page.paginator.count, "current_page": pagination.page.number, "total_pages": pagination.page.paginator.num_pages, "observed_at": timezone.now(), "source": "radius_accounting"})
 
 
 class DisconnectSessionView(APIView):
     permission_classes = [IsTenantManager]
     serializer_class = DisconnectSessionResponseSerializer
 
+    @idempotent
     def post(self, request, session_id):
         from apps.vouchers.models import Radacct
         from apps.vouchers.services import RadiusService
 
-        tenant = request.user.membership.tenant
-        router_addresses = NASDevice.objects.filter(tenant=tenant).values_list(
-            "ip_address", "wireguard_ip"
-        )
-        router_ips = {
-            str(address)
-            for addresses in router_addresses
-            for address in addresses
-            if address is not None
-        }
+        tenant = tenant_for(request)
+        router_ips = tenant_radius_addresses(tenant)
         try:
             session = Radacct.objects.get(
                 radacctid=session_id,

@@ -7,7 +7,7 @@ import secrets
 class TenantWhatsAppRoute(models.Model):
     tenant = models.OneToOneField("tenants.Tenant", on_delete=models.CASCADE, related_name="whatsapp_route")
     phone_number_id = models.CharField(max_length=100)
-    access_token_encrypted = models.CharField(max_length=500)
+    access_token_encrypted = models.TextField()
     webhook_token = models.CharField(max_length=64, unique=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -11,6 +11,36 @@ from .models import MacDevice
 User = get_user_model()
 
 class IoTDeviceTests(APITestCase):
+    def test_complete_frontend_form_fields_create_and_edit(self):
+        self.client.force_authenticate(self.manager)
+        expiry = (timezone.now() + timedelta(days=10)).replace(microsecond=0)
+        response = self.client.post(reverse("iot-device-list"), self.payload(
+            mac_address="aa-bb-cc-dd-ee-10", expires_at=expiry.isoformat(), is_active=False,
+        ), format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        device = MacDevice.objects.get(pk=response.data["id"])
+        self.assertEqual(device.mac_address, "AA:BB:CC:DD:EE:10")
+        self.assertEqual(device.plan, self.plan_a)
+        self.assertEqual(device.expires_at, expiry)
+        self.assertFalse(device.is_active)
+        self.assertEqual(response.data["plan_name"], self.plan_a.name)
+        new_expiry = expiry + timedelta(days=1)
+        detail = reverse("iot-device-detail", args=[device.pk])
+        edited = self.client.patch(detail, {
+            "mac_address": "AA:BB:CC:DD:EE:11", "device_name": "Edited camera",
+            "plan": self.plan_a.pk, "expires_at": new_expiry.isoformat(), "is_active": True,
+        }, format="json")
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        device.refresh_from_db()
+        self.assertEqual(device.device_name, "Edited camera")
+        self.assertEqual(device.mac_address, "AA:BB:CC:DD:EE:11")
+        self.assertEqual(device.expires_at, new_expiry)
+        self.assertTrue(device.is_active)
+        denied = self.client.patch(detail, {"plan": self.plan_b.pk}, format="json")
+        self.assertEqual(denied.status_code, status.HTTP_400_BAD_REQUEST)
+        device.refresh_from_db()
+        self.assertEqual(device.plan, self.plan_a)
+
     def setUp(self):
         self.a = Tenant.objects.create(name="A", slug="a")
         self.b = Tenant.objects.create(name="B", slug="b")

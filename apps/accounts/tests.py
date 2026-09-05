@@ -1,3 +1,7 @@
+from datetime import datetime, timedelta
+from unittest.mock import patch
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
@@ -178,6 +182,63 @@ class PasswordResetTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(self.old_password))
+
+    def test_expired_token_does_not_change_password(self):
+        issued_at = datetime.now() - timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT + 1)
+        with patch.object(default_token_generator, "_now", return_value=issued_at):
+            credentials = self.reset_credentials()
+        response = self.client.post(
+            reverse("password-reset-confirm"),
+            {**credentials, "password": self.new_password, "password_confirm": self.new_password},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.old_password))
+
+    def test_confirmation_rejects_mismatched_passwords_without_changing_account(self):
+        response = self.client.post(
+            reverse("password-reset-confirm"),
+            {**self.reset_credentials(), "password": self.new_password, "password_confirm": "Different-Password-7342"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password_confirm", response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.old_password))
+
+    def test_reset_token_cannot_be_used_for_another_account(self):
+        other = User.objects.create_user(
+            username="other-reset-owner", email="other-reset@example.com", password=self.old_password,
+        )
+        credentials = self.reset_credentials()
+        response = self.client.post(
+            reverse("password-reset-confirm"),
+            {**credentials, "uid": urlsafe_base64_encode(force_bytes(other.pk)),
+             "password": self.new_password, "password_confirm": self.new_password},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        for user in (self.user, other):
+            user.refresh_from_db()
+            self.assertTrue(user.check_password(self.old_password))
+
+    def test_old_refresh_cannot_restore_access_after_password_reset(self):
+        old_refresh = str(RefreshToken.for_user(self.user))
+        reset = self.client.post(
+            reverse("password-reset-confirm"),
+            {**self.reset_credentials(), "password": self.new_password, "password_confirm": self.new_password},
+            format="json",
+        )
+        self.assertEqual(reset.status_code, status.HTTP_200_OK)
+        refreshed = self.client.post(reverse("token-refresh"), {"refresh": old_refresh}, format="json")
+        # Implementations may reject refresh itself or reject its stale password
+        # claim when the resulting access token reaches an authenticated view.
+        if refreshed.status_code == status.HTTP_200_OK:
+            self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refreshed.data['access']}")
+            self.assertEqual(self.client.get(reverse("current-user")).status_code, status.HTTP_401_UNAUTHORIZED)
+        else:
+            self.assertEqual(refreshed.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_confirmation_enforces_django_password_validation(self):
         response = self.client.post(

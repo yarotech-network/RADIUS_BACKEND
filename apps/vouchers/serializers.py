@@ -3,6 +3,7 @@ from .models import InternetPlan, Voucher, PaymentTransaction
 
 
 class InternetPlanSerializer(serializers.ModelSerializer):
+    duration_hours = serializers.IntegerField(min_value=1, max_value=2147483647)
     price_display = serializers.CharField(source="get_price_display", read_only=True)
 
     class Meta:
@@ -15,6 +16,7 @@ class InternetPlanSerializer(serializers.ModelSerializer):
 
 
 class VoucherSerializer(serializers.ModelSerializer):
+    device_limit = serializers.IntegerField(min_value=1, max_value=2147483647, required=False)
     plan_name = serializers.CharField(source="plan.name", read_only=True)
     plan_duration = serializers.CharField(source="plan.duration_hours", read_only=True)
     price_display = serializers.CharField(source="plan.get_price_display", read_only=True)
@@ -41,6 +43,8 @@ class VoucherSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and value.tenant_id != request.user.membership.tenant_id:
             raise serializers.ValidationError("Plan does not belong to your tenant.")
+        if not value.is_active:
+            raise serializers.ValidationError("Plan is inactive.")
         return value
 
 
