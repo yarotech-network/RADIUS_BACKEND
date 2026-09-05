@@ -7,6 +7,7 @@ venv-*/
 .venv/
 docs/
 DJANGO_BACKEND_PROMPTS.md
+DJANGO_FRONTEND_PROMPTS.md
 
 __pycache__/
 *.py[cod]
