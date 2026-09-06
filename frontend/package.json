@@ -1,11 +1,16 @@
 {
   "name": "yarotech-radius-frontend",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
+  "description": "Web frontend for the Yarotech RADIUS hotspot platform (React + TypeScript + Vite).",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yarotech-network/yarotech-radius-frontend.git"
+  },
   "type": "module",
-  "description": "Management frontend for the Yarotech RADIUS API (multi-tenant hotspot / ISP voucher platform).",
   "engines": {
-    "node": ">=20.19"
+    "node": ">=20.19",
+    "npm": ">=10"
   },
   "scripts": {
     "dev": "vite",
