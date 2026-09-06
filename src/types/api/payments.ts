@@ -47,8 +47,26 @@ export interface PublicBuyRequest {
   phone?: string;
 }
 
+export interface PaymentCallbackPlan {
+  name: string;
+  duration_hours: number;
+  /** MB; 0 = unlimited. */
+  data_limit: number;
+}
+
+/**
+ * `GET payments/callback/?reference=` (anonymous). Customer vouchers use one access code as both
+ * username and password; `access_code` is present only while the voucher is still unused, so a
+ * shared or logged reference stops being a usable credential after the first login.
+ */
 export interface PaymentCallbackResponse {
   status: PaymentStatus;
   reference: string;
   voucher: string | null;
+  access_code?: string | null;
+  code_revealed?: boolean;
+  plan?: PaymentCallbackPlan | null;
+  tenant_name?: string;
+  /** e.g. `c•••@example.com` — for "we emailed it to …" copy. */
+  customer_email_masked?: string;
 }

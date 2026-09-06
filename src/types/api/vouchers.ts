@@ -38,6 +38,8 @@ export type VoucherSource = 'admin' | 'agent' | 'customer';
 export interface Voucher {
   id: number;
   username: string;
+  /** Single customer access code (username == password); null when the voucher has a separate, print-only password. */
+  access_code?: string | null;
   plan: number;
   plan_name: string;
   plan_duration: string;

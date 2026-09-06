@@ -35,7 +35,7 @@ export const storefrontApi = {
   /** 200 → redirect to Paystack; 503 → provider down but a pending transaction + reference exist. */
   buy: (payload: PublicBuyRequest, idempotencyKey = newIdempotencyKey('buy')) =>
     http.post<CheckoutStart>('/buy/', payload, { anonymous: true, tenantId: null, idempotencyKey }),
-  /** Paystack return handler: status + voucher username (never the password). */
+  /** Paystack return handler: status, plan and — while the voucher is unused — its access code. */
   result: (reference: string) =>
     http.get<PaymentCallbackResponse>(
       '/payments/callback/',

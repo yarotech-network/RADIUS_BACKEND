@@ -163,7 +163,7 @@ describe('checkout', () => {
 });
 
 describe('payment result', () => {
-  it('polls while pending and then shows the voucher username with a copy button', async () => {
+  it('polls while pending and then shows the access code with connection steps', async () => {
     let calls = 0;
     server.use(
       http.get(`${API}/payments/callback/`, ({ request }) => {
@@ -172,7 +172,16 @@ describe('payment result', () => {
         return HttpResponse.json(
           calls < 2
             ? { status: 'pending', reference: ref, voucher: null }
-            : { status: 'success', reference: ref, voucher: 'WH84OQ0oKp' },
+            : {
+                status: 'success',
+                reference: ref,
+                voucher: 'WH84QRKP',
+                access_code: 'WH84QRKP',
+                code_revealed: true,
+                plan: { name: 'Daily 1GB', duration_hours: 24, data_limit: 1024 },
+                tenant_name: 'Wuse Hotspot',
+                customer_email_masked: 'a•••@example.com',
+              },
         );
       }),
     );
@@ -182,14 +191,58 @@ describe('payment result', () => {
     expect(await screen.findByText('Waiting for confirmation')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Check again' }));
     expect(await screen.findByText('Payment successful')).toBeInTheDocument();
-    expect(screen.getByText('WH84OQ0oKp')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy username' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Access code' })).toHaveTextContent('WH84QRKP');
+    expect(screen.getByRole('button', { name: 'Copy access code' })).toBeInTheDocument();
+    expect(screen.getByText('Daily 1GB · 1 day · 1 GB')).toBeInTheDocument();
+    expect(screen.getByText('How to connect')).toBeInTheDocument();
+    expect(screen.getByText(/Join the Wuse Hotspot Wi-Fi network/)).toBeInTheDocument();
+    expect(screen.getByText(/A copy is on its way to a•••@example.com/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to plans' })).toHaveAttribute(
       'href',
       '/s/wuse-hotspot',
     );
     // settled → the remembered checkout is cleared
     await waitFor(() => expect(pendingCheckout.load()).toBeNull());
+  });
+
+  it('shows only the username once the backend stops revealing the code', async () => {
+    server.use(
+      http.get(`${API}/payments/callback/`, ({ request }) =>
+        HttpResponse.json({
+          status: 'success',
+          reference: new URL(request.url).searchParams.get('reference'),
+          voucher: 'WH84QRKP',
+          access_code: null,
+          code_revealed: false,
+          plan: { name: 'Daily 1GB', duration_hours: 24, data_limit: 1024 },
+          tenant_name: 'Wuse Hotspot',
+          customer_email_masked: 'a•••@example.com',
+        }),
+      ),
+    );
+    renderStore('/pay/result?reference=yarotech-used');
+    expect(await screen.findByText('Payment successful')).toBeInTheDocument();
+    expect(screen.getByText('WH84QRKP')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy username' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Access code' })).not.toBeInTheDocument();
+    expect(screen.getByText(/already been used to log in/)).toBeInTheDocument();
+    expect(screen.getByText(/emailed to a•••@example.com/)).toBeInTheDocument();
+  });
+
+  it('keeps working against the pre-change callback shape (username only)', async () => {
+    server.use(
+      http.get(`${API}/payments/callback/`, ({ request }) =>
+        HttpResponse.json({
+          status: 'success',
+          reference: new URL(request.url).searchParams.get('reference'),
+          voucher: 'legacyuser',
+        }),
+      ),
+    );
+    renderStore('/pay/result?reference=yarotech-legacy');
+    expect(await screen.findByText('Payment successful')).toBeInTheDocument();
+    expect(screen.getByText('legacyuser')).toBeInTheDocument();
+    expect(screen.getByText(/contact the business with this reference/)).toBeInTheDocument();
   });
 
   it('falls back to the remembered reference when Paystack drops the query string', async () => {

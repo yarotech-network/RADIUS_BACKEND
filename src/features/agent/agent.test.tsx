@@ -164,7 +164,7 @@ describe('agent home', () => {
 });
 
 describe('agent sell', () => {
-  it('sells from the public catalogue, previews the wallet charge and shows usernames only', async () => {
+  it('sells from the public catalogue, previews the wallet charge and shows the access codes', async () => {
     mockAgent();
     storeSlugStore.write('wuse-hotspot');
     let received: { body: unknown; key: string | null } | null = null;
@@ -172,7 +172,12 @@ describe('agent sell', () => {
       http.post(`${API}/agent/vouchers/generate/`, async ({ request }) => {
         received = { body: await request.json(), key: request.headers.get('Idempotency-Key') };
         return HttpResponse.json(
-          { vouchers: [allocation(), allocation({ id: 2, voucher_username: 'WHq2PYQtDW' })] },
+          {
+            vouchers: [
+              allocation({ voucher_username: 'WH84QRKP', access_code: 'WH84QRKP' }),
+              allocation({ id: 2, voucher_username: 'WHQ2PYQT', access_code: 'WHQ2PYQT' }),
+            ],
+          },
           { status: 201 },
         );
       }),
@@ -190,11 +195,26 @@ describe('agent sell', () => {
     expect(await screen.findByRole('heading', { name: '2 vouchers sold' })).toBeInTheDocument();
     expect(received!.body).toEqual({ plan_id: 1, quantity: 2 });
     expect(received!.key).toMatch(/^agent-gen-/);
-    expect(screen.getByText('WH84OQ0oKp')).toBeInTheDocument();
-    expect(
-      screen.getByText(/password for each voucher is issued by the operator/),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy all usernames' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Access codes' })).toHaveTextContent('WH84QRKP');
+    expect(screen.getByText(/enter it as both username and password/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy all codes' })).toBeInTheDocument();
+  });
+
+  it('stays honest about legacy vouchers whose password is not returned', async () => {
+    mockAgent();
+    storeSlugStore.write('wuse-hotspot');
+    server.use(
+      http.post(`${API}/agent/vouchers/generate/`, () =>
+        HttpResponse.json({ vouchers: [allocation({ access_code: null })] }, { status: 201 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage(<AgentSellPage />, { role: 'agent', path: '/agent/sell' });
+    await user.click(await screen.findByRole('radio', { name: 'Daily 1GB' }));
+    await user.click(screen.getByRole('button', { name: 'Sell voucher' }));
+    expect(await screen.findByRole('heading', { name: '1 voucher sold' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Voucher usernames' })).toHaveTextContent('WH84OQ0oKp');
+    expect(screen.getByText(/separate password issued by the operator/)).toBeInTheDocument();
   });
 
   it('blocks a sale that exceeds the balance and points to funding', async () => {
