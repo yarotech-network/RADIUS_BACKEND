@@ -35,12 +35,17 @@ export default function AgentVouchersPage() {
   const columns: Column<AgentVoucherAllocation>[] = [
     {
       key: 'username',
-      header: 'Voucher',
+      header: 'Access code',
       primary: true,
       cell: (a) => (
         <span className="inline-flex items-center gap-1">
           <code className="font-mono text-sm font-semibold text-ink-900">{a.voucher_username}</code>
           <CopyButton value={a.voucher_username} label={`Copy ${a.voucher_username}`} />
+          {a.access_code === null && (
+            <span className="text-xs text-ink-500" title="This voucher has a separate password">
+              (username only)
+            </span>
+          )}
         </span>
       ),
     },
@@ -137,8 +142,9 @@ export default function AgentVouchersPage() {
         />
       )}
       <Alert tone="info">
-        Voucher passwords are issued by your operator, not shown here. If a customer needs theirs
-        re-sent, contact the operator with the voucher username.
+        Each voucher&apos;s access code works as both username and password. Older vouchers with a
+        separate password show only the username — contact the operator if a customer needs one
+        re-issued.
       </Alert>
     </div>
   );

@@ -91,6 +91,8 @@ export interface AgentVoucherAllocation {
   agent: number;
   voucher: number;
   voucher_username: string;
+  /** Single customer access code (username == password); null for legacy vouchers. */
+  access_code?: string | null;
   allocation_type: AllocationType;
   amount_charged: Kobo;
   commission_earned: Kobo;

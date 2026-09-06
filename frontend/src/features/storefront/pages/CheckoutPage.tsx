@@ -154,7 +154,7 @@ function CheckoutForm({ plan, slug }: { plan: PublicPlan; slug: string }) {
       <FormField
         label="Email address"
         required
-        hint="Your receipt and login details will be sent here."
+        hint="Your access code is shown after payment and also emailed here."
         error={errors.email?.message}
       >
         <Input

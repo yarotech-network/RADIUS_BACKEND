@@ -141,12 +141,26 @@ export default function VoucherDetailPage() {
             <div className="flex flex-col gap-4">
               <Card>
                 <h2 className="text-sm font-semibold text-ink-900">Credentials</h2>
-                <p className="mt-1 text-sm text-ink-600">
-                  The password is never shown in the app.{' '}
-                  {canPrint
-                    ? 'Use Print to produce a card with both the username and password.'
-                    : 'A manager can print the card for the customer.'}
-                </p>
+                {voucher.access_code ? (
+                  <>
+                    <p className="mt-1 text-sm text-ink-600">
+                      Single access code — the customer enters it as both username and password.
+                    </p>
+                    <p className="mt-2 flex items-center gap-2">
+                      <code className="rounded border border-border bg-surface-muted px-2 py-1 font-mono text-base font-semibold tracking-wide text-ink-900">
+                        {voucher.access_code}
+                      </code>
+                      <CopyButton value={voucher.access_code} label="Copy access code" />
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-ink-600">
+                    This voucher has a separate password that is never shown in the app.{' '}
+                    {canPrint
+                      ? 'Use Print to produce a card with both the username and password.'
+                      : 'A manager can print the card for the customer.'}
+                  </p>
+                )}
               </Card>
               {voucher.status === 'unused' && voucher.generation_source !== 'admin' && (
                 <Alert tone="info">

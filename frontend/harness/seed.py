@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
 from apps.tenants.models import Tenant, TenantMembership, TenantSetting
-from apps.vouchers.models import InternetPlan, Voucher
+from apps.vouchers.models import InternetPlan, PaymentTransaction, Radacct, Voucher
 from apps.agents.models import AgentProfile, AgentWallet
 from apps.accounts.staff_models import StaffAssignment
 from apps.routers.models import NASDevice
@@ -26,6 +26,8 @@ wuse, _ = Tenant.objects.get_or_create(slug="wuse-hotspot", defaults={"name": "W
 garki, _ = Tenant.objects.get_or_create(slug="garki-net", defaults={"name": "Garki Net", "email": "hi@garki.test", "phone": "+2348022222222"})
 for t in (wuse, garki):
     TenantSetting.objects.get_or_create(tenant=t)
+# Agent sales prefix their access codes with the tenant setting (see AgentService).
+TenantSetting.objects.filter(tenant=wuse, voucher_prefix="").update(voucher_prefix="WH")
 
 admin = user("admin", "admin@yarotech.test", first_name="Platform", last_name="Admin", is_staff=True, is_superuser=True)
 TenantMembership.objects.get_or_create(user=admin, defaults={"tenant": platform, "role": "owner"})
@@ -66,8 +68,27 @@ if not Voucher.objects.filter(tenant=wuse).exists():
                                generation_source="admin", expires_at=(timezone.now() + timedelta(hours=plan.duration_hours)) if status == "active" else None,
                                activated_at=timezone.now() - timedelta(hours=1) if status in ("active", "expired") else None)
 
+# Storefront purchases in every state the payments / recovery / result-page tests look at.
+if not PaymentTransaction.objects.filter(tenant=wuse).exists():
+    daily = plans[0]
+    legacy_voucher = Voucher.objects.create(tenant=wuse, plan=daily, username="2ju2AUqb", password="k9Fj2LqPz3Xy", status="unused", generation_source="customer")
+    PaymentTransaction.objects.create(tenant=wuse, plan=daily, reference="PAY-FULFILLED-001", amount=daily.price, customer_email="fulfilled@example.com", status="success", verified_at=timezone.now() - timedelta(days=1), paid_at=timezone.now() - timedelta(days=1), voucher=legacy_voucher)
+    PaymentTransaction.objects.create(tenant=wuse, plan=daily, reference="PAY-UNFULFILLED-002", amount=daily.price, customer_email="unfulfilled@example.com", status="pending", verified_at=timezone.now() - timedelta(hours=2))
+    PaymentTransaction.objects.create(tenant=wuse, plan=daily, reference="PAY-PENDING-003", amount=daily.price, customer_email="pending@example.com", status="pending")
+    PaymentTransaction.objects.create(tenant=wuse, plan=daily, reference="PAY-FAILED-004", amount=daily.price, customer_email="failed@example.com", status="failed")
+    PaymentTransaction.objects.create(tenant=wuse, plan=plans[1], reference="PAY-ABANDONED-005", amount=plans[1].price, customer_email="abandoned@example.com", status="abandoned")
+    # Single-code purchase (username == password) whose code the public result endpoint still reveals.
+    code = Voucher.generate_access_code()
+    code_voucher = Voucher.objects.create(tenant=wuse, plan=daily, username=code, password=code, status="unused", generation_source="customer")
+    PaymentTransaction.objects.create(tenant=wuse, plan=daily, reference="PAY-FULFILLED-CODE-001", amount=daily.price, customer_email="code@example.com", status="success", verified_at=timezone.now() - timedelta(hours=1), paid_at=timezone.now() - timedelta(hours=1), voucher=code_voucher)
+
 NASDevice.objects.get_or_create(tenant=wuse, name="mikrotik-wuse-01", defaults={"ip_address": "10.100.100.12", "nas_secret": secret_store.encrypt("testing-shared-secret"), "location": "Wuse 2, Abuja", "onboarding_state": "active", "deployment_status": "deployed", "routeros_username": "admin"})
 NASDevice.objects.get_or_create(tenant=wuse, name="mikrotik-wuse-02", defaults={"ip_address": "10.100.100.13", "nas_secret": secret_store.encrypt("testing-shared-secret"), "location": "Jabi", "onboarding_state": "waiting_for_vpn"})
+# Live sessions come from the unmanaged FreeRADIUS accounting table; two open sessions on router 01.
+if not Radacct.objects.exists():
+    for i, (username, minutes) in enumerate([("WH10002", 42), ("WH10006", 7)]):
+        Radacct.objects.create(sessionid=f"8160000{i}", username=username, nasipaddress="10.100.100.12", nasportid=f"ether{i + 1}",
+                               acctstarttime=timezone.now() - timedelta(minutes=minutes), acctinputoctets=12_500_000 * (i + 1), acctoutputoctets=180_000_000 * (i + 1), acctsessiontime=minutes * 60)
 SubscriptionPlan.objects.get_or_create(name="Starter", defaults={"price": 1_500_000, "duration_days": 30, "features": ["1 router", "Unlimited vouchers"], "is_active": True})
 SubscriptionPlan.objects.get_or_create(name="Business", defaults={"price": 4_500_000, "duration_days": 30, "features": ["5 routers", "Agents", "WhatsApp delivery"], "is_active": True})
 print("seeded. password for all users:", PW)

@@ -7,10 +7,14 @@ import { cn } from '@/lib/utilities/cn';
 import { isApiError } from '@/services/api/errors';
 import { usePaymentResult } from '../queries';
 import { pendingCheckout } from '../pendingCheckout';
+import { AccessCodePanel } from '../components/AccessCodePanel';
 
 /**
  * `/pay/result?reference=` — where Paystack sends the customer back (configured in the Paystack
  * dashboard, gap #9). Falls back to the locally remembered checkout when the reference is missing.
+ *
+ * On success the backend returns the voucher's access code only while the voucher is unused; once
+ * the customer has logged in, the page shows the username alone and points at the email copy.
  */
 export default function PaymentResultPage() {
   const [params] = useSearchParams();
@@ -75,9 +79,19 @@ export default function PaymentResultPage() {
               <CheckCircle2 className="size-6" aria-hidden />
               <h2 className="text-lg font-semibold">Payment successful</h2>
             </div>
-            {result.data.voucher ? (
+            {result.data.access_code ? (
+              <AccessCodePanel
+                code={result.data.access_code}
+                tenantName={result.data.tenant_name}
+                plan={result.data.plan ?? null}
+                emailMasked={result.data.customer_email_masked}
+              />
+            ) : result.data.voucher ? (
               <>
-                <p className="mt-3 text-sm text-ink-700">Your Wi-Fi username:</p>
+                <p className="mt-3 text-sm text-ink-700">
+                  This access code has already been used to log in, so it is no longer shown here.
+                  Your Wi-Fi username:
+                </p>
                 <p className="mt-1 flex items-center gap-2">
                   <code className="rounded bg-white px-3 py-2 font-mono text-xl font-semibold tracking-wide text-ink-900">
                     {result.data.voucher}
@@ -85,14 +99,21 @@ export default function PaymentResultPage() {
                   <CopyButton value={result.data.voucher} label="Copy username" />
                 </p>
                 <p className="mt-3 text-sm text-ink-600">
-                  Your password is sent separately to the email address you entered. Keep this
-                  reference in case you need help.
+                  {result.data.customer_email_masked
+                    ? `The full access code was emailed to ${result.data.customer_email_masked}. `
+                    : ''}
+                  If you did not log in yourself, contact{' '}
+                  {result.data.tenant_name ?? 'the business'} with this reference.
                 </p>
               </>
             ) : (
               <p className="mt-3 text-sm text-ink-700">
-                Your payment went through. Your voucher is being prepared — this page will keep
-                checking, and the business will email your login details.
+                Your payment went through. Your access code is being prepared — this page will keep
+                checking
+                {result.data.customer_email_masked
+                  ? `, and a copy will be emailed to ${result.data.customer_email_masked}`
+                  : ''}
+                .
               </p>
             )}
           </section>

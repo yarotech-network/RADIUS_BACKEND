@@ -75,12 +75,14 @@ describe.runIf(import.meta.env.LIVE_API === '1')('phase 7 against live API', () 
     }
   });
 
-  it('agent generate: debits wallet, returns usernames only, replays on the same Idempotency-Key, and rejects foreign plans', async () => {
+  it('agent generate: debits wallet, returns the single access code, replays on the same Idempotency-Key, and rejects foreign plans', async () => {
     const before = await agentPortalApi.wallet();
     const key = `agent-gen-live-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     const first = await agentPortalApi.generate({ plan_id: 1, quantity: 1 }, key);
     expect(first.vouchers).toHaveLength(1);
-    expect(first.vouchers[0]!.voucher_username).toMatch(/^WH/);
+    // tenant prefix "WH" + 8-char code from the unambiguous alphabet; the code is the password too
+    expect(first.vouchers[0]!.voucher_username).toMatch(/^WH[ABCDEFGHJKMNPQRTUVWXYZ234678]{8}$/);
+    expect(first.vouchers[0]!.access_code).toBe(first.vouchers[0]!.voucher_username);
     expect(first.vouchers[0]).not.toHaveProperty('voucher_password');
     const replay = await agentPortalApi.generate({ plan_id: 1, quantity: 1 }, key);
     expect(replay.vouchers[0]!.id).toBe(first.vouchers[0]!.id);
@@ -116,15 +118,30 @@ describe.runIf(import.meta.env.LIVE_API === '1')('phase 7 against live API', () 
       expect(down.status).toBe(503);
       const reference = (down.body as { reference: string }).reference;
       expect(reference).toMatch(/^yarotech-/);
-      expect(await storefrontApi.result(reference)).toEqual({
+      expect(await storefrontApi.result(reference)).toMatchObject({
         status: 'pending',
         reference,
         voucher: null,
+        access_code: null,
+        code_revealed: false,
+        plan: null,
       });
+      // Seeded legacy voucher (separate password): username is reported, never a code.
       expect(await storefrontApi.result('PAY-FULFILLED-001')).toMatchObject({
         status: 'success',
         voucher: '2ju2AUqb',
+        access_code: null,
+        code_revealed: false,
+        plan: { name: 'Daily 1GB' },
+        tenant_name: 'Wuse Hotspot',
       });
+      // Fulfilled single-code purchase (seeded by the harness): code revealed while unused.
+      const fresh = await storefrontApi.result('PAY-FULFILLED-CODE-001');
+      expect(fresh.status).toBe('success');
+      expect(fresh.code_revealed).toBe(true);
+      expect(fresh.access_code).toBe(fresh.voucher);
+      expect(fresh.access_code).toMatch(/^[ABCDEFGHJKMNPQRTUVWXYZ234678]{8}$/);
+      expect(fresh.customer_email_masked).toMatch(/^.•••@/);
       expect((await fail(storefrontApi.result('zzz'))).status).toBe(404);
       expect(
         (await fail(storefrontApi.buy({ plan_id: 999, email: 'x@example.com' }))).fields.plan_id,

@@ -64,7 +64,14 @@ describe.runIf(import.meta.env.LIVE_API === '1')('phase 6 against live API', () 
     expect(notFulfilled.status).toBe(409);
     expect(notFulfilled.message).toMatch(/Only fulfilled payments/);
 
-    const deliveries = await paymentsApi.deliveries({ payment: fulfilled.id });
+    let deliveries = await paymentsApi.deliveries({ payment: fulfilled.id });
+    if (deliveries.results.length === 0) {
+      // Fresh harness: the seeded payment was fulfilled outside the purchase flow, so queue once.
+      expect(['pending', 'sending']).toContain(
+        (await paymentsApi.deliver(fulfilled.id, {})).status,
+      );
+      deliveries = await paymentsApi.deliveries({ payment: fulfilled.id });
+    }
     expect(deliveries.results.length).toBeGreaterThan(0);
     const latest = deliveries.results[0]!;
     if (latest.status === 'pending' || latest.status === 'sending') {
