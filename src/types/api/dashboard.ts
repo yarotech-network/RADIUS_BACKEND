@@ -74,6 +74,7 @@ export interface AuditEvent {
 }
 
 export interface AuditListParams extends PageParams {
+  /** Exact action key, e.g. `vouchers.generated`. */
   action?: string;
   actor?: number;
   tenant?: number;

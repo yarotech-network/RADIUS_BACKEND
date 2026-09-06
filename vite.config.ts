@@ -60,6 +60,7 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./vitest.setup.ts'],
+      globalSetup: ['./vitest.liveSetup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       css: false,
     },

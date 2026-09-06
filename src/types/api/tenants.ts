@@ -58,8 +58,8 @@ export interface TenantMembership {
 
 export interface TenantMembershipWrite {
   user: number;
-  /** Ignored for owners (forced to own tenant); required for platform admins. */
-  tenant?: number;
+  /** Required by the serializer even for owners (send your own tenant id); owners are pinned to their tenant server-side. */
+  tenant: number;
   role: MembershipRole;
 }
 

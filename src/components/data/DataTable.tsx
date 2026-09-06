@@ -1,4 +1,4 @@
-import type { Key, ReactNode } from 'react';
+import { Fragment, type Key, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utilities/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -42,6 +42,8 @@ export interface DataTableProps<T> {
   dense?: boolean;
   /** Whether this is a background refresh (keeps rows visible, dims them). */
   refreshing?: boolean;
+  /** Optional expansion panel rendered under a row (return null/undefined for collapsed rows). */
+  renderExpanded?: (row: T) => ReactNode;
 }
 
 const HIDE: Record<NonNullable<Column<unknown>['hideBelow']>, string> = {
@@ -75,6 +77,7 @@ export function DataTable<T>({
   className,
   dense,
   refreshing,
+  renderExpanded,
 }: DataTableProps<T>) {
   const showSkeleton = loading && !rows;
   const showError = Boolean(error) && !rows;
@@ -157,39 +160,51 @@ export function DataTable<T>({
             </tr>
           ))}
         {!showSkeleton &&
-          rows?.map((row) => (
-            <tr
-              key={rowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn(
-                'border-b border-border last:border-0',
-                onRowClick && 'cursor-pointer transition-colors hover:bg-brand-50/60',
-              )}
-            >
-              {columns.map((col) => (
-                <td
-                  key={col.key}
+          rows?.map((row) => {
+            const expanded = renderExpanded?.(row);
+            return (
+              <Fragment key={rowKey(row)}>
+                <tr
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(
-                    cellPad,
-                    'align-middle text-ink-900',
-                    alignClass(col.align),
-                    col.hideBelow && HIDE[col.hideBelow],
-                    col.className,
+                    'border-b border-border last:border-0',
+                    expanded && 'border-b-0',
+                    onRowClick && 'cursor-pointer transition-colors hover:bg-brand-50/60',
                   )}
                 >
-                  {col.cell(row)}
-                </td>
-              ))}
-              {rowActions && (
-                <td
-                  className={cn(cellPad, 'text-right align-middle')}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {rowActions(row)}
-                </td>
-              )}
-            </tr>
-          ))}
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={cn(
+                        cellPad,
+                        'align-middle text-ink-900',
+                        alignClass(col.align),
+                        col.hideBelow && HIDE[col.hideBelow],
+                        col.className,
+                      )}
+                    >
+                      {col.cell(row)}
+                    </td>
+                  ))}
+                  {rowActions && (
+                    <td
+                      className={cn(cellPad, 'text-right align-middle')}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {rowActions(row)}
+                    </td>
+                  )}
+                </tr>
+                {expanded && (
+                  <tr className="border-b border-border last:border-0">
+                    <td colSpan={columns.length + (rowActions ? 1 : 0)} className="p-0">
+                      {expanded}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
       </tbody>
     </table>
   );
@@ -233,6 +248,9 @@ export function DataTable<T>({
                     </div>
                   ))}
                 </dl>
+              )}
+              {renderExpanded?.(row) && (
+                <div className="-mx-4 mt-3 -mb-4">{renderExpanded(row)}</div>
               )}
             </li>
           );

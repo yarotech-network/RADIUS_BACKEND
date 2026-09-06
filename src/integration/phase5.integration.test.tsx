@@ -4,8 +4,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { server } from '@/test/server';
+import { liveTokens } from '@/test/liveSession';
 import { tokenStore } from '@/services/auth/tokenStore';
-import { authApi } from '@/services/auth/session';
 import type { ApiError } from '@/services/api/errors';
 import { routersApi } from '@/features/routers/api';
 import { agentsApi } from '@/features/agents/api';
@@ -16,9 +16,9 @@ import { checkRows, nextStates } from '@/features/routers/routerRules';
 const PASSWORD = 'Passw0rd!2026';
 const stamp = Date.now();
 
-beforeAll(async () => {
+beforeAll(() => {
   server.close();
-  tokenStore.set(await authApi.login('manager', PASSWORD));
+  tokenStore.set(liveTokens('manager'));
 });
 afterAll(() => server.listen({ onUnhandledRequest: 'error' }));
 
@@ -202,12 +202,11 @@ describe.runIf(import.meta.env.LIVE_API === '1')('phase 5 against live API', () 
   });
 
   it('staff cannot reach manager-only agent/operation endpoints (403 surfaces as forbidden)', async () => {
-    const staff = await authApi.login('staff', PASSWORD);
     const previous = {
       access: tokenStore.getAccess() ?? '',
       refresh: tokenStore.getRefresh() ?? '',
     };
-    tokenStore.set(staff);
+    tokenStore.set(liveTokens('staff'));
     try {
       const agents = await agentsApi.list({ page: 1 }).catch((e: unknown) => e);
       expect((agents as ApiError).kind).toBe('forbidden');
