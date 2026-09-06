@@ -15,9 +15,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "analyze": "ANALYZE=1 vite build"
+    "test": "vitest run --exclude \"src/integration/**\"",
+    "test:watch": "vitest --exclude \"src/integration/**\"",
+    "analyze": "ANALYZE=1 vite build",
+    "test:integration": "LIVE_API=1 VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1 vitest run src/integration"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

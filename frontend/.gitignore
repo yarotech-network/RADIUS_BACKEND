@@ -10,3 +10,4 @@ stats.html
 .DS_Store
 *.log
 .vite/
+harness.sqlite3

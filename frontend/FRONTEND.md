@@ -7,7 +7,7 @@ React 19 · TypeScript (strict) · Vite 7 · Tailwind CSS v4 · React Router v7 
 > implementation phase. The original analysis (backend audit, API → feature map, design system,
 > API gaps, phase plan) lives in [`analysis/`](./analysis/README.md).
 
-**Status:** Phase 2 (Foundation) complete. Phases 3–11 pending — see
+**Status:** Phases 2 (Foundation) and 3 (Shell & auth) complete. Phases 4–11 pending — see
 [`analysis/06_IMPLEMENTATION_PHASES.md`](./analysis/06_IMPLEMENTATION_PHASES.md).
 
 ---
@@ -123,6 +123,39 @@ src/
 - **Logout:** clear tokens first, then best-effort `POST /auth/logout/` (blacklists the refresh).
 - Password change/reset revokes all tokens server-side → the UI signs out and redirects to login.
 
+### Routing & guards (`app/router`, `app/auth/guards.tsx`)
+
+```
+RootLayout (error boundary)
+├─ RedirectIfAuthenticated → PublicLayout: /login /agent/login /register /forgot-password /reset-password
+├─ RequireBooted → PublicLayout: /accept-invitation /s/:slug /pay/result /pricing (+ /__dev/ui in dev)
+└─ RequireAuth
+   ├─ PublicLayout: /select-tenant /no-access
+   ├─ RequireSurface(platform)  → PlatformLayout  /platform/*
+   ├─ RequireSurface(agent)     → AgentLayout     /agent/*
+   └─ RequireSurface(workspace) → WorkspaceLayout /  (dashboard, vouchers, plans, payments, routers, …)
+```
+
+- `RequireAuth` stores the requested path in `location.state.from`; `RedirectIfAuthenticated` is the
+  **only** place that navigates after sign-in (to `from` if it is a same-origin path, else the
+  principal's home). Sign-in pages never call `navigate`, so there are no duplicate redirects.
+- `RequireSurface` sends principals to their own surface (`homePathFor`) and forces platform staff
+  without a selected tenant to `/select-tenant`.
+- Every page is a `lazy()` chunk; the login bundle does not include workspace code.
+
+### Shells (`app/shell`)
+
+| Surface   | < md                                        | md–lg                       | ≥ lg                                              |
+| --------- | ------------------------------------------- | --------------------------- | ------------------------------------------------- |
+| Workspace | top bar + 4-item bottom bar + "More" drawer | 72 px icon rail + top bar   | 256 px dark-blue sidebar (collapsible, persisted) |
+| Platform  | same, dark-blue top bar                     | rail                        | sidebar                                           |
+| Agent     | top bar + 5 bottom tabs                     | centred column, inline tabs | centred 3xl column                                |
+| Public    | centred card                                | —                           | —                                                 |
+
+Navigation items declare the capabilities that make them visible (`app/navigation/navConfig.ts`);
+`visibleGroups()` filters per principal, so tenant staff never see Agents/Audit/Settings and platform
+staff only see the areas their grants cover. Platform staff get a tenant switcher in the top bar.
+
 ### Principal & capabilities (`services/auth/principal.ts`)
 
 `Principal` is a discriminated union: `platform_admin | member(owner|manager|staff) | agent | platform_staff | none`.
@@ -165,13 +198,28 @@ Tokens live in `src/styles/index.css` (`@theme`) and are documented in
 - Unit tests sit next to the code (`*.test.ts(x)`); `npm test` runs them in jsdom with MSW
   (`src/test/server.ts`) — **no real network**, and unhandled requests fail the test.
 - `renderWithProviders()` wraps components with QueryClient, Toast and a MemoryRouter.
-- Phase 2 coverage: http client (headers, refresh single-flight, rotation, replay, blob/text),
-  error normaliser, token store, principal/`can()`, formatters, zod schemas, `applyApiErrors`,
-  `DataTable`, `FormField`, UI gallery smoke.
+- Coverage so far: http client (headers, refresh single-flight, rotation, replay, blob/text), error
+  normaliser, token store, principal/`can()`, formatters, zod schemas, `applyApiErrors`, `DataTable`,
+  `FormField`, UI gallery smoke, **auth flows per role** (owner/staff/admin/agent/platform staff/
+  no-role, wrong password, 429 countdown, redirect-back, sign-out, expired refresh) and the
+  responsive shells (bottom bar, drawer, collapse persistence, skip link).
+
+## 7. Verifying against the real API
+
+The backend needs PostgreSQL + FreeRADIUS in production. For frontend verification a
+**SQLite harness** runs the unmodified Django code (`radius-harness/` outside the repo: a settings
+module that swaps the database, a SQL file that creates the unmanaged `rad*` tables, and a seed
+script with one user per role — `admin`, `owner`, `manager`, `staff`, `pstaff` (2 tenants),
+`pstaff1` (1 tenant), `agent`, `agent2` (pending), `nobody`).
+
+`npm run test:integration` runs `src/integration/*.integration.test.tsx` against `127.0.0.1:8000`
+and has confirmed: login/refresh rotation + blacklist, `problem` envelopes, field-error shapes,
+`X-Tenant-ID` gating for platform staff, agent login shape, `Idempotency-Replayed` replay and 409 on
+payload mismatch, and the login throttle (`LIVE_API_THROTTLE=1`, consumes the 10/min budget).
 
 ---
 
-## 7. Phase log
+## 8. Phase log
 
 | Phase | Status | Notes                                                                                                                        |
 | ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |

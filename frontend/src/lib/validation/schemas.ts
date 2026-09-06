@@ -113,7 +113,7 @@ export const idempotentPrefixSchema = z
 /** Password + confirmation pair used by register / reset / invitation acceptance. */
 export const passwordPairRefinement = {
   check: (v: { password: string; password_confirm: string }) => v.password === v.password_confirm,
-  options: { message: 'Passwords do not match', path: ['password_confirm'] as const },
+  options: { message: 'Passwords do not match', path: ['password_confirm'] as string[] },
 };
 
 export const passwordPairShape = { password: passwordSchema, password_confirm: z.string() };

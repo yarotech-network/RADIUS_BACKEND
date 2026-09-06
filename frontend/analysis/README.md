@@ -8,7 +8,7 @@
 | [02_API_FEATURE_MAP.md](./02_API_FEATURE_MAP.md) | All 93 API paths → frontend feature → screen → user action, grouped by surface |
 | [03_FRONTEND_ARCHITECTURE.md](./03_FRONTEND_ARCHITECTURE.md) | Three surfaces (Workspace / Platform console / Agent portal) + Public; folder structure; data flow; HTTP client & auth/session design; caching policy; forms; tables; testing |
 | [04_DESIGN_SYSTEM.md](./04_DESIGN_SYSTEM.md) | Colour tokens (white / blue / dark-blue), typography, status vocabulary, component inventory, responsive layout matrix, accessibility |
-| [05_API_GAPS.md](./05_API_GAPS.md) | 22 backend gaps that constrain the UI, with the exact evidence and the honest fallback for each |
+| [05_API_GAPS.md](./05_API_GAPS.md) | 23 backend gaps that constrain the UI, with the exact evidence and the honest fallback for each |
 | [06_IMPLEMENTATION_PHASES.md](./06_IMPLEMENTATION_PHASES.md) | Phases 2–11 with definitions of done, verification approach, and new-repo hand-off |
 
 ## Executive summary

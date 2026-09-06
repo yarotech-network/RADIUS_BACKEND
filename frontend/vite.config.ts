@@ -51,6 +51,12 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => {
       },
     },
     test: {
+      env: {
+        ...(process.env.LIVE_API ? { LIVE_API: process.env.LIVE_API } : {}),
+        ...(process.env.LIVE_API_THROTTLE
+          ? { LIVE_API_THROTTLE: process.env.LIVE_API_THROTTLE }
+          : {}),
+      },
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./vitest.setup.ts'],

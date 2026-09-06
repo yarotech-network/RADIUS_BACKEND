@@ -22,7 +22,7 @@ export interface MenuProps {
   }) => ReactNode;
   items: (MenuItem | 'separator')[];
   align?: 'start' | 'end';
-  className?: string;
+  className?: string | undefined;
 }
 
 /** Lightweight dropdown menu with roving focus, ESC/outside-click dismissal. */

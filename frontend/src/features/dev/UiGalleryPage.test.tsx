@@ -8,7 +8,16 @@ describe('UI gallery smoke', () => {
   it('renders every section and opens overlays without crashing', async () => {
     renderWithProviders(<UiGalleryPage />);
     expect(screen.getByRole('heading', { name: 'UI gallery' })).toBeInTheDocument();
-    for (const name of ['Buttons', 'Form controls', 'Status vocabulary', 'Stats', 'Feedback', 'Overlays', 'Data table', 'Formatters']) {
+    for (const name of [
+      'Buttons',
+      'Form controls',
+      'Status vocabulary',
+      'Stats',
+      'Feedback',
+      'Overlays',
+      'Data table',
+      'Formatters',
+    ]) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
     }
     await userEvent.click(screen.getByRole('button', { name: 'Open dialog' }));
