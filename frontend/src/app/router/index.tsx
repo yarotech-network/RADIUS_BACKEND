@@ -53,6 +53,16 @@ const DevicesPage = lazyRoute(lazy(() => import('@/features/devices/pages/Device
 const PaymentsPage = lazyRoute(lazy(() => import('@/features/payments/pages/PaymentsPage')));
 const RecoveryPage = lazyRoute(lazy(() => import('@/features/payments/pages/RecoveryPage')));
 const AuditPage = lazyRoute(lazy(() => import('@/features/audit/pages/AuditPage')));
+const StorefrontPage = lazyRoute(lazy(() => import('@/features/storefront/pages/StorefrontPage')));
+const PaymentResultPage = lazyRoute(
+  lazy(() => import('@/features/storefront/pages/PaymentResultPage')),
+);
+const PricingPage = lazyRoute(lazy(() => import('@/features/storefront/pages/PricingPage')));
+const AgentHomePage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentHomePage')));
+const AgentSellPage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentSellPage')));
+const AgentWalletPage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentWalletPage')));
+const AgentVouchersPage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentVouchersPage')));
+const AgentProfilePage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentProfilePage')));
 const SettingsLayout = lazyRoute(lazy(() => import('@/features/settings/pages/SettingsLayout')));
 const GeneralSettingsPage = lazyRoute(
   lazy(() => import('@/features/settings/pages/GeneralSettingsPage')),
@@ -181,11 +191,11 @@ const platformRoutes: RouteObject[] = [
 
 /* ---------- agent portal ---------- */
 const agentRoutes: RouteObject[] = [
-  { index: true, element: <ComingSoon title="Home" phase={7} /> },
-  { path: 'sell', element: <ComingSoon title="Sell vouchers" phase={7} /> },
-  { path: 'wallet/*', element: <ComingSoon title="Wallet" phase={7} /> },
-  { path: 'vouchers', element: <ComingSoon title="My vouchers" phase={7} /> },
-  { path: 'profile', element: <ComingSoon title="Profile" phase={7} /> },
+  { index: true, Component: AgentHomePage },
+  { path: 'sell', Component: AgentSellPage },
+  { path: 'wallet/*', Component: AgentWalletPage },
+  { path: 'vouchers', Component: AgentVouchersPage },
+  { path: 'profile', Component: AgentProfilePage },
   { path: '*', element: <NotFoundPage homePath="/agent" /> },
 ];
 
@@ -218,9 +228,9 @@ export const router = createBrowserRouter([
         ),
         children: [
           { path: '/accept-invitation', Component: AcceptInvitationPage },
-          { path: '/s/:slug/*', element: <ComingSoon title="Storefront" phase={7} /> },
-          { path: '/pay/result', element: <ComingSoon title="Payment result" phase={7} /> },
-          { path: '/pricing', element: <ComingSoon title="Pricing" phase={7} /> },
+          { path: '/s/:slug/*', Component: StorefrontPage },
+          { path: '/pay/result', Component: PaymentResultPage },
+          { path: '/pricing', Component: PricingPage },
           ...devRoutes,
         ],
       },

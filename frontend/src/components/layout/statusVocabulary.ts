@@ -46,6 +46,10 @@ const TONES: Record<string, BadgeTone> = {
   cancelled: 'neutral',
   // invitations
   revoked: 'danger',
+  // agent allocations
+  wallet: 'info',
+  credit: 'warning',
+  complimentary: 'neutral',
   // generic booleans
   yes: 'success',
   no: 'neutral',
@@ -66,6 +70,9 @@ const LABELS: Record<string, string> = {
   not_deployed: 'Not deployed',
   unused: 'Unused',
   never: 'Never run',
+  wallet: 'Paid from wallet',
+  credit: 'On credit',
+  complimentary: 'Free',
 };
 
 export function statusTone(status: string | null | undefined): BadgeTone {
