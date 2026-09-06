@@ -49,6 +49,9 @@ const TONES: Record<string, BadgeTone> = {
   // generic booleans
   yes: 'success',
   no: 'neutral',
+  inactive: 'neutral',
+  never: 'neutral',
+  passed: 'success',
 };
 
 const LABELS: Record<string, string> = {
@@ -62,6 +65,7 @@ const LABELS: Record<string, string> = {
   accounting_failed: 'Accounting failed',
   not_deployed: 'Not deployed',
   unused: 'Unused',
+  never: 'Never run',
 };
 
 export function statusTone(status: string | null | undefined): BadgeTone {

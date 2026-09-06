@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utilities/cn';
 
 export type AlertTone = 'info' | 'success' | 'warning' | 'danger';
@@ -8,6 +8,8 @@ export interface AlertProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'
   tone?: AlertTone;
   title?: ReactNode;
   actions?: ReactNode;
+  /** Renders a close button; the parent owns visibility. */
+  onDismiss?: (() => void) | undefined;
 }
 
 const STYLES: Record<AlertTone, { box: string; icon: typeof Info }> = {
@@ -17,7 +19,15 @@ const STYLES: Record<AlertTone, { box: string; icon: typeof Info }> = {
   danger: { box: 'bg-danger-50 border-danger-100 text-danger-700', icon: AlertCircle },
 };
 
-export function Alert({ tone = 'info', title, actions, className, children, ...rest }: AlertProps) {
+export function Alert({
+  tone = 'info',
+  title,
+  actions,
+  onDismiss,
+  className,
+  children,
+  ...rest
+}: AlertProps) {
   const { box, icon: Icon } = STYLES[tone];
   return (
     <div
@@ -33,6 +43,16 @@ export function Alert({ tone = 'info', title, actions, className, children, ...r
         )}
         {actions && <div className="mt-2 flex flex-wrap gap-2">{actions}</div>}
       </div>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="-m-1 h-fit rounded p-1 opacity-70 hover:opacity-100"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

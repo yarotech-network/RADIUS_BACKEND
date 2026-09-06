@@ -5,7 +5,7 @@ export interface DescriptionItem {
   label: ReactNode;
   value: ReactNode;
   mono?: boolean;
-  span?: 1 | 2;
+  span?: 1 | 2 | 3;
 }
 
 export function DescriptionList({
@@ -28,7 +28,14 @@ export function DescriptionList({
       )}
     >
       {items.map((item, index) => (
-        <div key={index} className={cn('min-w-0', item.span === 2 && 'sm:col-span-2')}>
+        <div
+          key={index}
+          className={cn(
+            'min-w-0',
+            item.span === 2 && 'sm:col-span-2',
+            item.span === 3 && 'sm:col-span-2 lg:col-span-3',
+          )}
+        >
           <dt className="text-xs font-medium tracking-wide text-ink-500 uppercase">{item.label}</dt>
           <dd
             className={cn(
