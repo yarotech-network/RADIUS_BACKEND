@@ -57,13 +57,19 @@ class FundingCheckoutSerializer(serializers.Serializer):
 
 class AgentVoucherAllocationSerializer(serializers.ModelSerializer):
     voucher_username = serializers.CharField(source="voucher.username", read_only=True)
+    # The single access code the agent hands to the customer (username doubles as the password).
+    # None for vouchers issued before single-code credentials, whose password stays print-only.
+    access_code = serializers.SerializerMethodField()
 
     class Meta:
         model = AgentVoucherAllocation
         fields = [
-            "id", "agent", "voucher", "voucher_username",
+            "id", "agent", "voucher", "voucher_username", "access_code",
             "allocation_type", "amount_charged", "commission_earned", "created_at",
         ]
+
+    def get_access_code(self, allocation):
+        return allocation.voucher.access_code
 
 
 class AgentGeneratedVouchersSerializer(serializers.Serializer):

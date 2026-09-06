@@ -206,6 +206,10 @@ EMAIL_BACKEND = config(
 )
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@yarotech.local")
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
+# Voucher access-code emails go through Resend (https://resend.com) when a key is configured;
+# DEFAULT_FROM_EMAIL must then belong to a domain verified in Resend. Without a key the delivery
+# worker falls back to EMAIL_BACKEND (console in development).
+RESEND_API_KEY = config("RESEND_API_KEY", default="")
 PASSWORD_RESET_FRONTEND_URL = config(
     "PASSWORD_RESET_FRONTEND_URL",
     default="http://localhost:5173/reset-password?uid={uid}&token={token}",
