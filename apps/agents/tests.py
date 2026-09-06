@@ -103,6 +103,25 @@ class AgentApiTests(AgentFixtureMixin, APITestCase):
         self.assertEqual(too_large.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(AgentWalletFundingPayment.objects.exists())
 
+    @patch("apps.vouchers.services.Radcheck.objects.create")
+    def test_agent_sale_returns_the_access_code_to_hand_to_the_customer(self, radius_create):
+        plan = InternetPlan.objects.create(tenant=self.tenant, name="Daily", price=25_000, duration_hours=24, rate_limit="5M/10M")
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            reverse("agent-voucher-generate"), {"plan_id": plan.pk, "quantity": 2}, format="json",
+            HTTP_IDEMPOTENCY_KEY="agent-sale-access-code-1",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        rows = response.data["vouchers"]
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["access_code"], row["voucher_username"])
+            self.assertRegex(row["access_code"], r"^[ABCDEFGHJKMNPQRTUVWXYZ234678]{8}$")
+        history = self.client.get(reverse("agent-voucher-history"))
+        self.assertEqual({r["access_code"] for r in history.data["results"]}, {r["access_code"] for r in rows})
+
 
 class AgentWalletServiceTests(AgentFixtureMixin, APITestCase):
     def setUp(self):

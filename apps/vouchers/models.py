@@ -2,7 +2,6 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 import secrets
-import string
 
 
 class InternetPlan(models.Model):
@@ -59,12 +58,27 @@ class Voucher(models.Model):
     def __str__(self):
         return f"{self.username} ({self.status})"
 
-    @staticmethod
-    def generate_credentials(prefix=""):
-        alphabet = string.ascii_letters + string.digits
-        username = prefix + "".join(secrets.choice(alphabet) for _ in range(8))
-        password = "".join(secrets.choice(alphabet) for _ in range(12))
-        return username, password
+    # Access codes are read off a screen or spoken over the phone, so the alphabet drops the
+    # look-alikes 0/O, 1/I/L, 5/S and 9 (vs. g/q when handwritten). 8 characters over 28 symbols
+    # ≈ 38 bits, which is ample for a single-use hotspot voucher behind RADIUS rate limiting.
+    ACCESS_CODE_ALPHABET = "ABCDEFGHJKMNPQRTUVWXYZ234678"
+    ACCESS_CODE_LENGTH = 8
+
+    @classmethod
+    def generate_access_code(cls, prefix=""):
+        return prefix + "".join(secrets.choice(cls.ACCESS_CODE_ALPHABET) for _ in range(cls.ACCESS_CODE_LENGTH))
+
+    @classmethod
+    def generate_credentials(cls, prefix=""):
+        """One code serves as both username and password: the customer only ever handles a
+        single access code. Vouchers created before this change keep their separate passwords."""
+        code = cls.generate_access_code(prefix)
+        return code, code
+
+    @property
+    def access_code(self):
+        """The single customer-facing code, or None when the voucher has a separate password."""
+        return self.username if self.password == self.username else None
 
     def activate(self):
         activated_at = timezone.now()

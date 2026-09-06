@@ -82,13 +82,26 @@ Verified evidence is retained when voucher fulfillment fails, yielding
 `paid_unfulfilled`. Concurrent recovery produces one voucher and one set of
 credential rows. Provider verification remains outside the fulfillment lock.
 
-Delivery is an explicit authenticated command after fulfillment. States are
+Fulfilment queues one credential delivery automatically whenever the payment has
+a `customer_email` (`queue_credential_delivery`, inside the fulfilment
+transaction; webhook replays and recovery retries reuse the existing job). The
+authenticated `deliver/` command remains the way to resend. States are
 `pending`, `sending`, `accepted`, `failed`, `unknown`. `accepted` means acceptance
-by the configured email backend, not delivery to an inbox. A timeout/crash can
+by the email provider, not delivery to an inbox. A timeout/crash can
 leave an unknown outcome. The worker never automatically resends that message.
 Repeating an accepted/unknown delivery requires
 `acknowledge_duplicate_risk: true`. Payment and delivery history remain separate.
 There is no public resend/recovery endpoint.
+
+Customer vouchers carry a single access code (username == password; 8 characters
+from an alphabet without look-alike glyphs, generated with `secrets`). The email
+(Resend HTTPS API when `RESEND_API_KEY` is set, otherwise `EMAIL_BACKEND`) states
+the operator, plan, duration/data, amount, reference, the code and connection
+steps; each delivery job's id is passed as Resend's `Idempotency-Key`. The public
+`payments/callback/` response reveals `access_code` only while the voucher is
+`unused`, so a shared or logged reference stops being a usable credential after
+the customer's first login. Vouchers issued before this change keep their
+separate passwords and are never revealed through the public endpoint.
 
 ### Idempotency and errors
 
@@ -182,8 +195,33 @@ Router jobs use five-minute leases and attempt fencing. Expired leases may be
 retried because WireGuard set/remove converges on the stored desired state.
 Failed jobs expose a safe error code and require a deliberate new command.
 Email jobs left sending for over five minutes become unknown, never automatic
-resends. `EMAIL_TIMEOUT` defaults to 30 seconds. Configure SMTP rather than
-treating console-backend acceptance as actual email delivery.
+resends. `EMAIL_TIMEOUT` defaults to 30 seconds and also bounds the Resend HTTP
+call. Configure `RESEND_API_KEY` (or SMTP) rather than treating console-backend
+acceptance as actual email delivery. Because purchases now queue their own
+delivery, `process_payment_deliveries` must run continuously in production —
+every 30–60 seconds is a sensible cadence, for example with a systemd timer:
+
+```ini
+# /etc/systemd/system/radius-deliveries.service
+[Service]
+Type=oneshot
+User=radius
+WorkingDirectory=/srv/radius-backend
+EnvironmentFile=/srv/radius-backend/.env
+ExecStart=/srv/radius-backend/venv/bin/python manage.py process_payment_deliveries --limit 20
+
+# /etc/systemd/system/radius-deliveries.timer
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=30
+AccuracySec=5
+[Install]
+WantedBy=timers.target
+```
+
+(or `* * * * * cd /srv/radius-backend && venv/bin/python manage.py process_payment_deliveries --limit 20`
+in cron for a one-minute cadence). Alert on `pending` deliveries older than a few
+minutes: that means the timer is not running.
 
 Watch pending age, failed router operations, unknown deliveries, paid-unfulfilled
 payments and processing API commands. Production alert thresholds, ownership and
@@ -218,7 +256,7 @@ compatibility or production operational readiness.
 | Deployment safety | NOT VERIFIED | No production deployment or real provider/device smoke test was authorized or performed. |
 | Rollback strategy | NOT VERIFIED | Local restore and schema reversal tested; new long ciphertext cannot safely fit old short columns. Production rollback requires a planned forward fix or restored backup and stopped workers. |
 
-Before production: validate real Paystack verification/webhooks, SMTP delivery,
+Before production: validate real Paystack verification/webhooks, Resend/SMTP delivery,
 WireGuard/RouterOS/FreeRADIUS schemas and counter policies, RADIUS authentication
 and disconnect behavior; coordinate client changes; configure workers, HTTPS,
 secrets, monitoring and the production migration/rollback window.

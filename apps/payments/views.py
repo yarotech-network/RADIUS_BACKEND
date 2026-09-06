@@ -64,8 +64,23 @@ class InitializePaymentView(APIView):
         })
 
 
+def mask_email(address):
+    """`customer@example.com` -> `c•••@example.com`; enough for "we emailed it to …" copy."""
+    if not address or "@" not in address:
+        return ""
+    local, domain = address.rsplit("@", 1)
+    return f"{local[:1]}\u2022\u2022\u2022@{domain}"
+
+
 class PaymentCallbackView(APIView):
-    """Handle Paystack return URL callback."""
+    """Handle Paystack return URL callback.
+
+    The public result page polls this with the payment reference. Once the purchase is fulfilled
+    the response carries the voucher's single access code (username == password for customer
+    vouchers) — but only while the voucher is still unused. After the customer's first login the
+    reference stops revealing a usable credential, so a leaked or shared reference (browser
+    history, Paystack receipt, support chat) cannot be replayed by someone else.
+    """
 
     permission_classes = [permissions.AllowAny]
     serializer_class = PaymentTransactionSerializer
@@ -76,11 +91,20 @@ class PaymentCallbackView(APIView):
             return Response({"error": "Missing reference"}, status=400)
 
         try:
-            transaction = PaymentTransaction.objects.get(reference=reference)
+            transaction = PaymentTransaction.objects.select_related("voucher__plan", "tenant").get(reference=reference)
         except PaymentTransaction.DoesNotExist:
             return Response({"error": "Payment not found"}, status=404)
-        return Response({
+        voucher = transaction.voucher
+        reveal = voucher is not None and voucher.status == "unused" and voucher.password == voucher.username
+        response = Response({
             "status": transaction.status,
             "reference": reference,
-            "voucher": transaction.voucher.username if transaction.voucher else None,
+            "voucher": voucher.username if voucher else None,
+            "access_code": voucher.username if reveal else None,
+            "code_revealed": reveal,
+            "plan": {"name": voucher.plan.name, "duration_hours": voucher.plan.duration_hours, "data_limit": voucher.plan.data_limit} if voucher else None,
+            "tenant_name": transaction.tenant.name,
+            "customer_email_masked": mask_email(transaction.customer_email),
         })
+        response["Cache-Control"] = "no-store"
+        return response

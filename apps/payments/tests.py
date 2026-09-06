@@ -13,7 +13,8 @@ from apps.agents.models import AgentProfile, AgentWallet, AgentWalletFundingPaym
 from apps.tenants.models import Tenant, TenantSetting
 from apps.vouchers.models import InternetPlan, PaymentTransaction, Voucher
 from apps.subscriptions.models import SubscriptionPayment, SubscriptionPlan, TenantSubscription
-from .models import PaystackWebhookEvent
+from .delivery import build_credential_email, run_one_delivery
+from .models import PaymentDelivery, PaystackWebhookEvent
 
 
 User = get_user_model()
@@ -112,6 +113,23 @@ class PaystackWebhookTests(APITestCase):
         self.assertIsNotNone(self.payment.voucher)
         self.assertEqual(Voucher.objects.count(), 1)
         self.assertEqual(PaystackWebhookEvent.objects.filter(processed=True).count(), 1)
+        # Fulfilment queues the access-code email exactly once, even across webhook replays.
+        self.assertEqual(PaymentDelivery.objects.filter(payment=self.payment, status="pending").count(), 1)
+        # Customer vouchers carry a single readable access code as both username and password.
+        voucher = self.payment.voucher
+        self.assertEqual(voucher.username, voucher.password)
+        self.assertRegex(voucher.username, r"^[ABCDEFGHJKMNPQRTUVWXYZ234678]{8}$")
+
+    @patch("apps.vouchers.services.Radcheck.objects.create")
+    @patch("apps.payments.webhooks.get_paystack_service")
+    def test_fulfilled_payment_without_email_queues_no_delivery(self, service_factory, radius_create):
+        PaymentTransaction.objects.filter(pk=self.payment.pk).update(customer_email="")
+        payload = self.event()
+        service_factory.return_value.verify_transaction.return_value = self.verified(payload)
+        self.assertEqual(self.post_event(payload).status_code, status.HTTP_200_OK)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "success")
+        self.assertFalse(PaymentDelivery.objects.exists())
 
     @patch("apps.payments.webhooks.get_paystack_service")
     def test_amount_mismatch_does_not_fulfill_or_store_event(self, service_factory):
@@ -292,3 +310,111 @@ class PaymentPublicApiTests(APITestCase):
 
         self.assertEqual(missing.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(unknown.status_code, status.HTTP_404_NOT_FOUND)
+
+    def fulfilled_payment(self, code="ABCDEFGH", password=None, voucher_status="unused"):
+        voucher = Voucher.objects.create(
+            tenant=self.tenant, plan=self.plan, username=code, password=password or code, status=voucher_status,
+            generation_source="customer",
+        )
+        return PaymentTransaction.objects.create(
+            reference=f"ref-{code}", amount=self.plan.price, customer_email="buyer@example.com",
+            tenant=self.tenant, plan=self.plan, voucher=voucher, status="success",
+        )
+
+    def test_callback_reveals_access_code_only_while_voucher_is_unused(self):
+        pending = PaymentTransaction.objects.create(
+            reference="ref-pending", amount=self.plan.price, customer_email="buyer@example.com",
+            tenant=self.tenant, plan=self.plan,
+        )
+        response = self.client.get(reverse("payment-callback"), {"reference": pending.reference})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["status"], "pending")
+        self.assertIsNone(response.json()["access_code"])
+        self.assertIsNone(response.json()["plan"])
+
+        unused = self.fulfilled_payment("ABCDEFGH")
+        response = self.client.get(reverse("payment-callback"), {"reference": unused.reference})
+        body = response.json()
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertEqual(body["status"], "success")
+        self.assertEqual(body["voucher"], "ABCDEFGH")
+        self.assertEqual(body["access_code"], "ABCDEFGH")
+        self.assertTrue(body["code_revealed"])
+        self.assertEqual(body["plan"], {"name": "Standard", "duration_hours": 24, "data_limit": 0})
+        self.assertEqual(body["tenant_name"], "Tenant A")
+        self.assertEqual(body["customer_email_masked"], "b\u2022\u2022\u2022@example.com")
+        self.assertNotIn("buyer@example.com", json.dumps(body))
+
+        used = self.fulfilled_payment("JKMNPQRT", voucher_status="active")
+        body = self.client.get(reverse("payment-callback"), {"reference": used.reference}).json()
+        self.assertEqual(body["voucher"], "JKMNPQRT")
+        self.assertIsNone(body["access_code"])
+        self.assertFalse(body["code_revealed"])
+
+        # Legacy vouchers with a separate password never leak it through the public endpoint.
+        legacy = self.fulfilled_payment("legacyuser", password="separate-secret")
+        body = self.client.get(reverse("payment-callback"), {"reference": legacy.reference}).json()
+        self.assertEqual(body["voucher"], "legacyuser")
+        self.assertIsNone(body["access_code"])
+        self.assertNotIn("separate-secret", json.dumps(body))
+
+    def test_credential_email_contains_code_plan_and_reference_once(self):
+        payment = self.fulfilled_payment("WXYZ2346")
+        subject, text, html = build_credential_email(payment)
+        self.assertEqual(subject, "Your Tenant A Wi-Fi access code")
+        for body in (text, html):
+            self.assertIn("WXYZ2346", body)
+            self.assertIn("Standard", body)
+            self.assertIn("1 day", body)
+            self.assertIn("Unlimited data", body)
+            self.assertIn(payment.reference, body)
+            self.assertIn("both username and password", body)
+
+    @override_settings(RESEND_API_KEY="re_test_key", DEFAULT_FROM_EMAIL="Tenant <no-reply@example.com>")
+    @patch("apps.payments.delivery.requests.post")
+    def test_delivery_worker_sends_through_resend_when_configured(self, post):
+        post.return_value = Mock(status_code=200, json=lambda: {"id": "email-1"})
+        payment = self.fulfilled_payment("R2D2C3P6")
+        delivery = PaymentDelivery.objects.create(payment=payment)
+
+        self.assertTrue(run_one_delivery())
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, "accepted")
+        post.assert_called_once()
+        url, kwargs = post.call_args[0][0], post.call_args[1]
+        self.assertEqual(url, "https://api.resend.com/emails")
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer re_test_key")
+        self.assertEqual(kwargs["headers"]["Idempotency-Key"], f"payment-delivery/{delivery.pk}")
+        self.assertEqual(kwargs["json"]["to"], ["buyer@example.com"])
+        self.assertEqual(kwargs["json"]["from"], "Tenant <no-reply@example.com>")
+        self.assertIn("R2D2C3P6", kwargs["json"]["text"])
+        self.assertIn("R2D2C3P6", kwargs["json"]["html"])
+        self.assertFalse(run_one_delivery())
+
+    @override_settings(RESEND_API_KEY="re_test_key")
+    @patch("apps.payments.delivery.requests.post")
+    def test_resend_rejection_fails_delivery_and_outage_leaves_it_unknown(self, post):
+        rejected = PaymentDelivery.objects.create(payment=self.fulfilled_payment("AAAA2222"))
+        post.return_value = Mock(status_code=422, json=lambda: {"message": "invalid from"})
+        self.assertTrue(run_one_delivery())
+        rejected.refresh_from_db()
+        self.assertEqual((rejected.status, rejected.error_code), ("failed", "email_not_accepted"))
+
+        outage = PaymentDelivery.objects.create(payment=self.fulfilled_payment("BBBB3333"))
+        post.return_value = Mock(status_code=503, json=lambda: {})
+        self.assertTrue(run_one_delivery())
+        outage.refresh_from_db()
+        self.assertEqual((outage.status, outage.error_code), ("unknown", "delivery_outcome_unknown"))
+
+    @override_settings(RESEND_API_KEY="", EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_delivery_worker_falls_back_to_django_mail_without_resend(self):
+        from django.core import mail
+
+        payment = self.fulfilled_payment("CCCC4444")
+        PaymentDelivery.objects.create(payment=payment)
+        self.assertTrue(run_one_delivery())
+        self.assertEqual(PaymentDelivery.objects.get(payment=payment).status, "accepted")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["buyer@example.com"])
+        self.assertIn("CCCC4444", mail.outbox[0].body)
+        self.assertEqual(mail.outbox[0].alternatives[0][1], "text/html")

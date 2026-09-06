@@ -216,7 +216,8 @@ Back up the database before applying encryption to an existing environment.
 | `RADIUS_AUTH_HOST`, `RADIUS_AUTH_PORT` | FreeRADIUS authentication endpoint |
 | `RADIUS_COA_PORT` | RADIUS Change-of-Authorization/disconnect port |
 | `WHATSAPP_APP_SECRET` | WhatsApp integration secret |
-| `EMAIL_BACKEND`, `DEFAULT_FROM_EMAIL` | Password-reset email delivery |
+| `EMAIL_BACKEND`, `DEFAULT_FROM_EMAIL` | Password-reset email delivery; fallback transport for access-code emails |
+| `RESEND_API_KEY` | Resend API key for voucher access-code emails (`DEFAULT_FROM_EMAIL` domain must be verified in Resend). Empty = use `EMAIL_BACKEND` |
 | `PASSWORD_RESET_FRONTEND_URL` | HTTPS reset URL containing `{uid}` and `{token}` placeholders |
 
 Production startup deliberately fails when critical security values are missing or unsafe.
@@ -302,7 +303,7 @@ Voucher lists support filtering, search, ordering, and standard pagination.
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `POST` | `/api/v1/buy/` | Initialize public voucher checkout |
-| `GET` | `/api/v1/payments/callback/?reference=...` | Read checkout result after provider redirect |
+| `GET` | `/api/v1/payments/callback/?reference=...` | Read checkout result after provider redirect; carries the voucher `access_code` only while the voucher is still unused |
 | `POST` | `/api/v1/payments/paystack/webhook/{token}/` | Receive authenticated Paystack events |
 
 The callback only reads local payment state. Final fulfillment is driven by authenticated provider verification/webhook processing.

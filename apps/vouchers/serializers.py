@@ -22,11 +22,14 @@ class VoucherSerializer(serializers.ModelSerializer):
     price_display = serializers.CharField(source="plan.get_price_display", read_only=True)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     agent_name = serializers.CharField(source="agent.user.username", read_only=True, default=None)
+    # Username when it doubles as the password (single-code vouchers); None for legacy or manual
+    # vouchers, whose separate password remains write-only and print-only.
+    access_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = Voucher
         fields = [
-            "id", "username", "password", "plan", "plan_name", "plan_duration",
+            "id", "username", "password", "access_code", "plan", "plan_name", "plan_duration",
             "price_display", "tenant", "tenant_name", "agent", "agent_name",
             "status", "generation_source", "device_limit", "expires_at",
             "activated_at", "created_at",

@@ -40,6 +40,22 @@ class VoucherServiceTests(VoucherFixtureMixin, APITestCase):
         self.assertEqual(radius_create.call_count, 4)
         self.assertTrue(all(voucher.username.startswith("A-") for voucher in vouchers))
 
+    @patch("apps.vouchers.services.Radcheck.objects.create")
+    def test_generated_credentials_are_one_readable_access_code(self, radius_create):
+        # Customers read the code off a screen or an email, so username and password are the
+        # same 8-character code drawn from an alphabet without look-alike characters.
+        vouchers = VoucherService.generate_vouchers(self.tenant, self.plan.id, 5, prefix="WU-")
+        for voucher in vouchers:
+            self.assertEqual(voucher.username, voucher.password)
+            self.assertRegex(voucher.username, r"^WU-[ABCDEFGHJKMNPQRTUVWXYZ234678]{8}$")
+        self.assertEqual(len({v.username for v in vouchers}), 5)
+        # RADIUS receives the same code as the cleartext password.
+        password_rows = [c.kwargs for c in radius_create.call_args_list if c.kwargs["attribute"] == "Cleartext-Password"]
+        self.assertEqual({r["username"] for r in password_rows}, {v.username for v in vouchers})
+        self.assertTrue(all(r["value"] == r["username"] for r in password_rows))
+        for forbidden in "0O1Il5S":
+            self.assertNotIn(forbidden, Voucher.ACCESS_CODE_ALPHABET)
+
     @patch("apps.vouchers.services.Radcheck.objects.create", side_effect=RuntimeError("radius unavailable"))
     def test_generation_rolls_back_voucher_when_radius_write_fails(self, radius_create):
         with self.assertRaisesRegex(RuntimeError, "radius unavailable"):
@@ -190,3 +206,15 @@ class VoucherApiTests(VoucherFixtureMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual([item["id"] for item in response.data["results"]], [own.id])
+
+    def test_voucher_api_exposes_single_access_code_but_never_a_separate_password(self):
+        legacy = Voucher.objects.create(username="legacy-user", password="separate", tenant=self.tenant_a, plan=self.plan_a)
+        single = Voucher.objects.create(username="ABCDEFGH", password="ABCDEFGH", tenant=self.tenant_a, plan=self.plan_a)
+        self.client.force_authenticate(self.manager)
+
+        rows = {item["id"]: item for item in self.client.get(reverse("voucher-list")).data["results"]}
+
+        self.assertIsNone(rows[legacy.id]["access_code"])
+        self.assertEqual(rows[single.id]["access_code"], "ABCDEFGH")
+        self.assertNotIn("password", rows[legacy.id])
+        self.assertNotIn("separate", str(rows))
