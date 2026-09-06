@@ -1,4 +1,4 @@
-import type { IsoDateTime } from './common';
+import type { IsoDateTime, PageParams } from './common';
 
 /** Computed server-side by `User.role`. */
 export type UserRole =
@@ -136,6 +136,17 @@ export interface StaffInvitationWrite {
   email: string;
   tenant: number;
   services: StaffService[];
+}
+
+export interface StaffInvitationListParams extends PageParams {
+  tenant?: number;
+  status?: StaffInvitationStatus;
+}
+
+export interface StaffAssignmentListParams extends PageParams {
+  user?: number;
+  tenant?: number;
+  is_active?: boolean;
 }
 
 export interface AcceptInvitationRequest {

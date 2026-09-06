@@ -13,7 +13,6 @@ import { WorkspaceLayout } from '@/app/shell/WorkspaceLayout';
 import { PlatformLayout } from '@/app/shell/PlatformLayout';
 import { AgentLayout } from '@/app/shell/AgentLayout';
 import { NotFoundPage } from '@/app/shell/NotFoundPage';
-import { ComingSoon } from '@/app/shell/ComingSoon';
 import { RequireCapability } from '@/app/auth/RequireCapability';
 import { PaymentRedirect } from '@/features/payments/pages/PaymentRedirect';
 
@@ -63,6 +62,23 @@ const AgentSellPage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentS
 const AgentWalletPage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentWalletPage')));
 const AgentVouchersPage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentVouchersPage')));
 const AgentProfilePage = lazyRoute(lazy(() => import('@/features/agent/pages/AgentProfilePage')));
+const PlatformOverviewPage = lazyRoute(
+  lazy(() => import('@/features/platform/pages/PlatformOverviewPage')),
+);
+const TenantsPage = lazyRoute(lazy(() => import('@/features/platform/pages/TenantsPage')));
+const TenantDetailPage = lazyRoute(
+  lazy(() => import('@/features/platform/pages/TenantDetailPage')),
+);
+const PlatformRoutersPage = lazyRoute(
+  lazy(() => import('@/features/platform/pages/PlatformRoutersPage')),
+);
+const PlatformPaymentsPage = lazyRoute(
+  lazy(() => import('@/features/platform/pages/PlatformPaymentsPage')),
+);
+const StaffPage = lazyRoute(lazy(() => import('@/features/platform/pages/StaffPage')));
+const PlatformAuditPage = lazyRoute(
+  lazy(() => import('@/features/platform/pages/PlatformAuditPage')),
+);
 const SettingsLayout = lazyRoute(lazy(() => import('@/features/settings/pages/SettingsLayout')));
 const GeneralSettingsPage = lazyRoute(
   lazy(() => import('@/features/settings/pages/GeneralSettingsPage')),
@@ -180,12 +196,13 @@ const workspaceRoutes: RouteObject[] = [
 
 /* ---------- platform console (platform admin) ---------- */
 const platformRoutes: RouteObject[] = [
-  { index: true, element: <ComingSoon title="Platform overview" phase={8} /> },
-  { path: 'tenants/*', element: <ComingSoon title="Tenants" phase={8} /> },
-  { path: 'routers', element: <ComingSoon title="Router fleet" phase={8} /> },
-  { path: 'payments', element: <ComingSoon title="Payments" phase={8} /> },
-  { path: 'staff', element: <ComingSoon title="Staff" phase={8} /> },
-  { path: 'audit', element: <ComingSoon title="Audit log" phase={8} /> },
+  { index: true, Component: PlatformOverviewPage },
+  { path: 'tenants', Component: TenantsPage },
+  { path: 'tenants/:id', Component: TenantDetailPage },
+  { path: 'routers', Component: PlatformRoutersPage },
+  { path: 'payments', Component: PlatformPaymentsPage },
+  { path: 'staff', Component: StaffPage },
+  { path: 'audit', Component: PlatformAuditPage },
   { path: '*', element: <NotFoundPage homePath="/platform" /> },
 ];
 

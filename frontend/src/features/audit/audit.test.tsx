@@ -23,7 +23,8 @@ const event = (extra: Partial<AuditEvent> = {}): AuditEvent => ({
 describe('audit vocabulary', () => {
   it('labels known and unknown actions and picks a tone', () => {
     expect(actionLabel('vouchers.generated')).toBe('Vouchers generated');
-    expect(actionLabel('macdevice.deleted')).toBe('Macdevice deleted');
+    expect(actionLabel('macdevice.deleted')).toBe('Device removed');
+    expect(actionLabel('widget.deleted')).toBe('Widget deleted');
     expect(actionLabel('weird')).toBe('Weird');
     expect(actionTone('router.secrets_replaced')).toBe('danger');
     expect(actionTone('agent.created')).toBe('success');
