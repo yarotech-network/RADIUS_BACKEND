@@ -1,4 +1,4 @@
-import type { IsoDateTime, Kobo } from './common';
+import type { IsoDateTime, Kobo, PageParams } from './common';
 
 export interface SubscriptionPlan {
   id: number;
@@ -43,4 +43,10 @@ export interface SubscriptionPayment {
 export interface PlatformSubscriptionPayment extends SubscriptionPayment {
   id: number;
   tenant: number;
+}
+
+export interface SubscriptionPaymentListParams extends PageParams {
+  tenant?: number;
+  status?: SubscriptionPaymentStatus;
+  plan?: number;
 }

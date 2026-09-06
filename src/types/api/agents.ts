@@ -67,6 +67,18 @@ export interface FundingListParams extends PageParams {
   reference?: string;
 }
 
+/** `platform/wallet-payments/` rows carry the owning tenant and agent ids. */
+export interface PlatformWalletPayment extends AgentFundingPayment {
+  tenant_id: number;
+  agent_id: number;
+}
+
+export interface PlatformWalletPaymentListParams extends PageParams {
+  status?: FundingStatus;
+  wallet__agent__tenant?: number;
+  wallet__agent?: number;
+}
+
 export interface FundWalletRequest {
   /** ≥ 50 000 kobo (₦500) and ≤ tenant max_funding_amount. */
   amount: Kobo;

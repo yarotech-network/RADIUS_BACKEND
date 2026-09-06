@@ -1,4 +1,4 @@
-import type { IsoDateTime, Kobo } from './common';
+import type { IsoDateTime, Kobo, PageParams } from './common';
 
 export interface Tenant {
   id: number;
@@ -13,6 +13,11 @@ export interface Tenant {
   updated_at: IsoDateTime;
   member_count: number;
   voucher_count: number;
+}
+
+export interface TenantListParams extends PageParams {
+  is_active?: boolean;
+  is_platform_admin?: boolean;
 }
 
 export interface TenantWrite {
@@ -54,6 +59,12 @@ export interface TenantMembership {
   user_display: string;
   tenant_display: string;
   created_at: IsoDateTime;
+}
+
+export interface MembershipListParams extends PageParams {
+  role?: MembershipRole;
+  user?: number;
+  tenant?: number;
 }
 
 export interface TenantMembershipWrite {
