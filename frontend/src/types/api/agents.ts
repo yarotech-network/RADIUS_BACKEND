@@ -13,7 +13,8 @@ export interface AgentProfile {
   status: AgentStatus;
   /** Decimal string, e.g. "10.00". */
   commission_rate: string;
-  wallet_balance: Kobo;
+  /** Null when the wallet row has not been created yet (legacy agents). */
+  wallet_balance: Kobo | null;
   created_at: IsoDateTime;
 }
 

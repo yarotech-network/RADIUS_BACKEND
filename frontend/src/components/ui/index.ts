@@ -20,3 +20,4 @@ export * from './Menu';
 export * from './CopyButton';
 export * from './DescriptionList';
 export * from './Stat';
+export * from './PasswordInput';

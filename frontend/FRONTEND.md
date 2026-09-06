@@ -220,6 +220,11 @@ Tokens live in `src/styles/index.css` (`@theme`) and are documented in
   `FormField`, UI gallery smoke, **auth flows per role** (owner/staff/admin/agent/platform staff/
   no-role, wrong password, 429 countdown, redirect-back, sign-out, expired refresh) and the
   responsive shells (bottom bar, drawer, collapse persistence, skip link).
+- Feature pages are tested through MSW with the real route tree (`renderPage()`): plans, vouchers,
+  dashboard, routers (list filters, state-machine buttons, 409 busy notice, stale-secrets reload,
+  RADIUS test 503), agents (create with idempotency key, field errors, approve, sales tab) and
+  devices (register/normalise MAC, remove, staff read-only). MSW picks the **first** matching
+  handler, so per-test overrides must be listed before shared defaults in `server.use()`.
 
 ## 7. Core operations (Phase 4)
 
@@ -236,6 +241,23 @@ Printing: the server only reveals passwords through the per-voucher HTML page. `
 parses each page and renders a 2-column A4 sheet (`buildPrintSheet`) into a hidden iframe (`printHtml`),
 fetching sequentially with progress and collecting failures instead of aborting.
 
+## 7b. Network & partners (Phase 5)
+
+| Screen                           | Endpoints                                                                                                                                  | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Routers `/routers`               | `routers/` (+`onboarding_state`, `deployment_status`, `is_active`, `search`, `ordering`)                                                   | Badges combine onboarding state + deployment + inactive; “VPN” column; staff see the list read-only.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Add router `/routers/new`        | `POST routers/` (idempotent)                                                                                                               | 4-step form (basics → RADIUS secret → WireGuard → RouterOS). Steps validate independently; server field errors jump back to the offending step.                                                                                                                                                                                                                                                                                                                                                                                      |
+| Router `/routers/:id`            | `routers/{id}/`, `health/`, `checks/`, `audit/`, `transition/`, `provisioning/`, `replace-secrets/`, `test/`, `router-operations/?router=` | Tabs: **Onboarding** (stepper + only the transitions `ROUTER_TRANSITIONS` allows + 6 checks incl. never-run), **VPN** (provision/suspend with blocker reasons, 5 s polling while an operation is open, 409 → notice), **Secrets** (write-only; `expected_updated_at` optimistic lock → 409 offers reload), **RADIUS test** (429 countdown from `Retry-After`, 503 shown as service down), **History** (audit timeline). Health shows “Telemetry not available” (gap #9). Edit/Delete honour the server's busy/deployed guards (409). |
+| Operations `/routers/operations` | `router-operations/?router&status&action`                                                                                                  | Cross-router log of provision/suspend runs; live while any operation is pending/running.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Agents `/agents`                 | `tenant/agents/` (+`status`, `search`, `ordering`)                                                                                         | Manager-only. Drawer creates the agent as **pending**; commission sent as a 2-dp decimal string.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Agent `/agents/:id`              | `tenant/agents/{id}/`, `PATCH`, `approve/`, `suspend/`, `vouchers/?search=<username>`                                                      | Approve / re-activate / suspend with confirmation; edit phone/shop/commission; **Vouchers sold** tab reuses the voucher list search and keeps rows where `agent === id` (gap: no dedicated agent filter).                                                                                                                                                                                                                                                                                                                            |
+| Devices `/devices`               | `iot-devices/` (+`is_active`, `plan`, `search`), `POST`/`PATCH`/`DELETE`                                                                   | MAC-allow-listed equipment on a plan until an expiry; MAC normalised client-side to the server's `AA:BB:CC:DD:EE:FF`; datetime-local ↔ ISO conversion; staff read-only.                                                                                                                                                                                                                                                                                                                                                              |
+
+Router permissions follow the backend exactly: list/retrieve for every member, everything else
+`IsTenantManager`; platform staff get `routers.view` (health/checks/audit) and `routers.test` from
+their service grants. Viewer-only principals never call the manager-only operations endpoint
+(`useRouterOperations(params, enabled)`).
+
 ## 8. Verifying against the real API
 
 The backend needs PostgreSQL + FreeRADIUS in production. For frontend verification a
@@ -249,8 +271,12 @@ and has confirmed: login/refresh rotation + blacklist, `problem` envelopes, fiel
 `X-Tenant-ID` gating for platform staff, agent login shape, `Idempotency-Replayed` replay and 409 on
 payload mismatch, the login throttle (`LIVE_API_THROTTLE=1`, consumes the 10/min budget), plan CRUD,
 the voucher lifecycle (generate → print parse → disable → edit/delete rules → 404), live-users
-filtering/validation, disconnect → 503 without a reachable NAS, and the Phase 4 pages rendering live
-data (`pages.integration.test.tsx`).
+filtering/validation, disconnect → 503 without a reachable NAS, the Phase 4 pages rendering live
+data (`pages.integration.test.tsx`), and — Phase 5 (`phase5.integration.test.tsx`) — router
+create → state-machine transitions (invalid → 400) → health/checks/audit → PATCH (secrets rejected)
+→ replace-secrets (stale 409, wrong password 400, success) → delete, deployed router delete → 409,
+agent create (duplicate → field error) → approve → edit → suspend → filtered list, device MAC
+normalisation → filters → patch → delete, and staff receiving 403 on manager-only endpoints.
 
 ---
 
@@ -260,8 +286,10 @@ data (`pages.integration.test.tsx`).
 | ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | 1     | ✅     | Analysis approved (`analysis/`).                                                                                             |
 | 2     | ✅     | Toolchain, tokens, API types, http/auth services, formatting/validation libs, component library, dev gallery, 43 unit tests. |
-| 3     | ⏳     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation).                                       |
-| 4–11  | ⏳     | See phase plan.                                                                                                              |
+| 3     | ✅     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation), SQLite harness, live tests.           |
+| 4     | ✅     | Dashboard, plans, vouchers (generate/print/detail), live sessions.                                                           |
+| 5     | ✅     | Routers (list/register/detail/operations), agents (directory/detail), devices. 109 unit + 21 live tests.                     |
+| 6–11  | ⏳     | Payments & recovery, audit log, settings/team/subscription; agent portal; public storefront; platform admin; hardening.      |
 
 ### Toolchain notes
 

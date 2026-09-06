@@ -40,6 +40,15 @@ const GenerateVouchersPage = lazyRoute(
 const VoucherDetailPage = lazyRoute(
   lazy(() => import('@/features/vouchers/pages/VoucherDetailPage')),
 );
+const RoutersPage = lazyRoute(lazy(() => import('@/features/routers/pages/RoutersPage')));
+const NewRouterPage = lazyRoute(lazy(() => import('@/features/routers/pages/NewRouterPage')));
+const RouterOperationsPage = lazyRoute(
+  lazy(() => import('@/features/routers/pages/RouterOperationsPage')),
+);
+const RouterDetailPage = lazyRoute(lazy(() => import('@/features/routers/pages/RouterDetailPage')));
+const AgentsPage = lazyRoute(lazy(() => import('@/features/agents/pages/AgentsPage')));
+const AgentDetailPage = lazyRoute(lazy(() => import('@/features/agents/pages/AgentDetailPage')));
+const DevicesPage = lazyRoute(lazy(() => import('@/features/devices/pages/DevicesPage')));
 
 const devRoutes: RouteObject[] = import.meta.env.DEV
   ? [
@@ -74,9 +83,31 @@ const workspaceRoutes: RouteObject[] = [
     children: [{ path: 'vouchers/generate', Component: GenerateVouchersPage }],
   },
   { path: 'payments/*', element: <ComingSoon title="Payments" phase={6} /> },
-  { path: 'routers/*', element: <ComingSoon title="Routers" phase={5} /> },
-  { path: 'agents/*', element: <ComingSoon title="Agents" phase={5} /> },
-  { path: 'devices', element: <ComingSoon title="Devices" phase={5} /> },
+  {
+    element: <RequireCapability capability="routers.view" />,
+    children: [
+      { path: 'routers', Component: RoutersPage },
+      { path: 'routers/:id', Component: RouterDetailPage },
+    ],
+  },
+  {
+    element: <RequireCapability capability="routers.manage" />,
+    children: [
+      { path: 'routers/new', Component: NewRouterPage },
+      { path: 'routers/operations', Component: RouterOperationsPage },
+    ],
+  },
+  {
+    element: <RequireCapability capability="agents.manage" />,
+    children: [
+      { path: 'agents', Component: AgentsPage },
+      { path: 'agents/:id', Component: AgentDetailPage },
+    ],
+  },
+  {
+    element: <RequireCapability capability="devices.view" />,
+    children: [{ path: 'devices', Component: DevicesPage }],
+  },
   { path: 'audit', element: <ComingSoon title="Audit log" phase={6} /> },
   { path: 'settings/*', element: <ComingSoon title="Settings" phase={6} /> },
   { path: '*', element: <NotFoundPage /> },
