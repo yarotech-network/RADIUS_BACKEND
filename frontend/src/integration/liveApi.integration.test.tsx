@@ -4,6 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { server } from '@/test/server';
+import { liveTokens } from '@/test/liveSession';
 import { request, http, refreshAccessToken } from '@/services/api/http';
 import { tokenStore } from '@/services/auth/tokenStore';
 import { authApi, loadPrincipal } from '@/services/auth/session';
@@ -62,8 +63,7 @@ describe.runIf(import.meta.env.LIVE_API === '1')('live API', () => {
   });
 
   it('platform staff: assignments, X-Tenant-ID gating, grants → capabilities', async () => {
-    const tokens = await authApi.login('pstaff', PASSWORD);
-    tokenStore.set(tokens);
+    tokenStore.set(liveTokens('pstaff'));
     const principal = await loadPrincipal();
     expect(principal.kind).toBe('platform_staff');
     if (principal.kind !== 'platform_staff') return;
@@ -118,8 +118,7 @@ describe.runIf(import.meta.env.LIVE_API === '1')('live API', () => {
   });
 
   it('idempotent command replays with Idempotency-Replayed', async () => {
-    const tokens = await authApi.login('manager', PASSWORD);
-    tokenStore.set(tokens);
+    tokenStore.set(liveTokens('manager'));
     const plans = await http.get<Paginated<{ id: number }>>('/plans/', { page_size: 1 });
     const key = `it-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const first = await request<unknown[]>({

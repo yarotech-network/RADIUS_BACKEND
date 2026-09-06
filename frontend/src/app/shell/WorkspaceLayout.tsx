@@ -11,7 +11,7 @@ export function WorkspaceLayout() {
     <AppShell
       groups={WORKSPACE_NAV}
       homePath="/"
-      profilePath="/settings/profile"
+      profilePath="/settings/general"
       topBarStart={
         isStaff ? (
           <TenantSwitcher />

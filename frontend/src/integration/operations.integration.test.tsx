@@ -3,8 +3,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { server } from '@/test/server';
+import { liveTokens } from '@/test/liveSession';
 import { tokenStore } from '@/services/auth/tokenStore';
-import { authApi } from '@/services/auth/session';
 import { ApiError } from '@/services/api/errors';
 import { plansApi } from '@/features/plans/api';
 import { vouchersApi } from '@/features/vouchers/api';
@@ -12,12 +12,9 @@ import { dashboardApi } from '@/features/dashboard/api';
 import { routersApi } from '@/features/routers/api';
 import { parsePrintHtml } from '@/features/vouchers/printing';
 
-const PASSWORD = 'Passw0rd!2026';
-
-beforeAll(async () => {
+beforeAll(() => {
   server.close();
-  const tokens = await authApi.login('manager', PASSWORD);
-  tokenStore.set(tokens);
+  tokenStore.set(liveTokens('manager'));
 });
 afterAll(() => server.listen({ onUnhandledRequest: 'error' }));
 

@@ -15,6 +15,7 @@ import { AgentLayout } from '@/app/shell/AgentLayout';
 import { NotFoundPage } from '@/app/shell/NotFoundPage';
 import { ComingSoon } from '@/app/shell/ComingSoon';
 import { RequireCapability } from '@/app/auth/RequireCapability';
+import { PaymentRedirect } from '@/features/payments/pages/PaymentRedirect';
 
 /* ---------- lazily loaded pages (one chunk per page) ---------- */
 const LoginPage = lazyRoute(lazy(() => import('@/features/auth/pages/LoginPage')));
@@ -49,6 +50,22 @@ const RouterDetailPage = lazyRoute(lazy(() => import('@/features/routers/pages/R
 const AgentsPage = lazyRoute(lazy(() => import('@/features/agents/pages/AgentsPage')));
 const AgentDetailPage = lazyRoute(lazy(() => import('@/features/agents/pages/AgentDetailPage')));
 const DevicesPage = lazyRoute(lazy(() => import('@/features/devices/pages/DevicesPage')));
+const PaymentsPage = lazyRoute(lazy(() => import('@/features/payments/pages/PaymentsPage')));
+const RecoveryPage = lazyRoute(lazy(() => import('@/features/payments/pages/RecoveryPage')));
+const AuditPage = lazyRoute(lazy(() => import('@/features/audit/pages/AuditPage')));
+const SettingsLayout = lazyRoute(lazy(() => import('@/features/settings/pages/SettingsLayout')));
+const GeneralSettingsPage = lazyRoute(
+  lazy(() => import('@/features/settings/pages/GeneralSettingsPage')),
+);
+const BillingSettingsPage = lazyRoute(
+  lazy(() => import('@/features/settings/pages/BillingSettingsPage')),
+);
+const TeamSettingsPage = lazyRoute(
+  lazy(() => import('@/features/settings/pages/TeamSettingsPage')),
+);
+const SubscriptionSettingsPage = lazyRoute(
+  lazy(() => import('@/features/settings/pages/SubscriptionSettingsPage')),
+);
 
 const devRoutes: RouteObject[] = import.meta.env.DEV
   ? [
@@ -82,7 +99,17 @@ const workspaceRoutes: RouteObject[] = [
     element: <RequireCapability capability="vouchers.generate" />,
     children: [{ path: 'vouchers/generate', Component: GenerateVouchersPage }],
   },
-  { path: 'payments/*', element: <ComingSoon title="Payments" phase={6} /> },
+  {
+    element: <RequireCapability capability="payments.view" />,
+    children: [
+      { path: 'payments', Component: PaymentsPage },
+      { path: 'payments/:id', element: <PaymentRedirect /> },
+    ],
+  },
+  {
+    element: <RequireCapability capability="payments.recovery.view" />,
+    children: [{ path: 'payments/recovery', Component: RecoveryPage }],
+  },
   {
     element: <RequireCapability capability="routers.view" />,
     children: [
@@ -108,8 +135,36 @@ const workspaceRoutes: RouteObject[] = [
     element: <RequireCapability capability="devices.view" />,
     children: [{ path: 'devices', Component: DevicesPage }],
   },
-  { path: 'audit', element: <ComingSoon title="Audit log" phase={6} /> },
-  { path: 'settings/*', element: <ComingSoon title="Settings" phase={6} /> },
+  {
+    element: <RequireCapability capability="audit.view" />,
+    children: [{ path: 'audit', Component: AuditPage }],
+  },
+  {
+    element: <RequireCapability anyOf={['settings.profile', 'team.view', 'subscription.view']} />,
+    children: [
+      {
+        path: 'settings',
+        Component: SettingsLayout,
+        children: [
+          { index: true, element: <Navigate to="/settings/general" replace /> },
+          { path: 'profile', element: <Navigate to="/settings/general" replace /> },
+          { path: 'general', Component: GeneralSettingsPage },
+          {
+            element: <RequireCapability capability="settings.billing" />,
+            children: [{ path: 'billing', Component: BillingSettingsPage }],
+          },
+          {
+            element: <RequireCapability capability="team.view" />,
+            children: [{ path: 'team', Component: TeamSettingsPage }],
+          },
+          {
+            element: <RequireCapability capability="subscription.view" />,
+            children: [{ path: 'subscription', Component: SubscriptionSettingsPage }],
+          },
+        ],
+      },
+    ],
+  },
   { path: '*', element: <NotFoundPage /> },
 ];
 

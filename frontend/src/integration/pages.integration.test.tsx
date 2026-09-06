@@ -2,9 +2,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { server } from '@/test/server';
+import { liveTokens } from '@/test/liveSession';
 import { renderPage } from '@/test/renderPage';
 import { tokenStore } from '@/services/auth/tokenStore';
-import { authApi, loadPrincipal } from '@/services/auth/session';
+import { loadPrincipal } from '@/services/auth/session';
 import type { Principal } from '@/services/auth/principal';
 import VouchersPage from '@/features/vouchers/pages/VouchersPage';
 import PlansPage from '@/features/plans/pages/PlansPage';
@@ -15,7 +16,7 @@ let principal: Principal;
 
 beforeAll(async () => {
   server.close();
-  tokenStore.set(await authApi.login('manager', 'Passw0rd!2026'));
+  tokenStore.set(liveTokens('manager'));
   principal = await loadPrincipal();
 });
 afterAll(() => server.listen({ onUnhandledRequest: 'error' }));

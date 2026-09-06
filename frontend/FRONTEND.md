@@ -223,8 +223,13 @@ Tokens live in `src/styles/index.css` (`@theme`) and are documented in
 - Feature pages are tested through MSW with the real route tree (`renderPage()`): plans, vouchers,
   dashboard, routers (list filters, state-machine buttons, 409 busy notice, stale-secrets reload,
   RADIUS test 503), agents (create with idempotency key, field errors, approve, sales tab) and
-  devices (register/normalise MAC, remove, staff read-only). MSW picks the **first** matching
-  handler, so per-test overrides must be listed before shared defaults in `server.use()`.
+  devices (register/normalise MAC, remove, staff read-only), payments (status filter, drawer
+  deep-link, staff vs manager hand-off), recovery (attention banner, retry 503 with idempotency key,
+  409 acknowledgement → resend with flag, platform staff without `payments.support` read-only),
+  audit (labels/tones, “You”/“User #n”/“System”, details expansion, action/actor filters) and the
+  settings tabs (partial PATCHes, write-only Paystack keys, add-by-user-ID with `tenant`, last-owner
+  guards, 404 → “no subscription”, checkout 503 → reference polling). MSW picks the **first**
+  matching handler, so per-test overrides must be listed before shared defaults in `server.use()`.
 
 ## 7. Core operations (Phase 4)
 
@@ -258,6 +263,21 @@ Router permissions follow the backend exactly: list/retrieve for every member, e
 their service grants. Viewer-only principals never call the manager-only operations endpoint
 (`useRouterOperations(params, enabled)`).
 
+## 7c. Money, accountability & administration (Phase 6)
+
+| Screen                                           | Endpoints                                                                                                                | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Payments `/payments`                             | `payments/transactions/` (+`status`, `search`, `ordering`), `…/{id}/`                                                    | Read-only purchase history for every member. Row → drawer (`?payment=<id>`; `/payments/:id` redirects there so links are shareable). Managers get a hand-off to recovery for successful payments.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Recovery `/payments/recovery`                    | `payment-recovery/` (+`status`, `plan`, `search`), `retry/`, `deliver/`, `payment-deliveries/?payment=`                  | Manager+ (`payments.recovery.view`; platform staff via `payments.view`). “Needs attention” = paid without voucher or failed email (client-side on the current page — the API cannot filter on the computed statuses). **Re-verify** POSTs `retry/` with an `Idempotency-Key`: 503 = provider unreachable (nothing changed), 409 = verification/plan mismatch. **Email credentials** follows the server rules in `paymentRules.ts`: only `success` + voucher; if the last delivery was accepted/unknown the UI asks for the duplicate-risk acknowledgement up front (and also on a 409 that says so) and resends with `acknowledge_duplicate_risk: true`. Delivery history polls every 5 s while a delivery is pending/sending. Actions need `payments.recovery.act` (`payments.support` grant for staff). |
+| Audit log `/audit`                               | `audit-events/` (+`action`, `actor`, `search`, `ordering`)                                                               | Manager+. Curated labels/tones for the known action keys (`auditVocabulary.ts`), unknown keys humanised. Resource keys `app.model:pk` parse into deep links (voucher, router, agent, payment). Actor shows **You** / `User #n` / **System** (gap #20: the API returns ids only; “Mine” filter uses the principal's id). Details JSON is rendered as key/value rows in an expandable panel (`DataTable renderExpanded`).                                                                                                                                                                                                                                                                                                                                                                                   |
+| Settings → General `/settings/general`           | `tenants/profile/` (GET/PATCH), `auth/change-password/`                                                                  | Business profile form (manager+) sends only changed fields. **Your account** shows the numeric user ID with a copy button (owners add teammates by ID — gap #3) and the change-password form; the API's `old_password` error lands on its field. Because SimpleJWT runs with `CHECK_REVOKE_TOKEN`, **every token issued before the change is rejected afterwards** — the form therefore re-logs in with the new password (`signIn`) and falls back to a sign-out with a message if that fails.                                                                                                                                                                                                                                                                                                            |
+| Settings → Billing `/settings/billing`           | `tenants/settings/` (GET/PATCH)                                                                                          | Paystack keys are write-only: fields start blank with placeholder “Unchanged” and are only included in the PATCH when typed; the response never echoes them. Commission %, voucher prefix and max top-up (₦ → kobo) validated to the serializer's limits.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Settings → Team `/settings/team`                 | `tenant-memberships/` (+`role`), `POST`, `PATCH {role}`, `DELETE`                                                        | Every member can see the team; writes are owner-only (`team.manage`). Add-by-user-ID **must send `tenant` = own tenant id** (the serializer requires it even for owners — gap #27). The sole owner's role select and remove button are disabled client-side and the server's “final tenant owner” 400 is surfaced verbatim if reached. “Already exists” / “does not exist” field errors are reworded.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Settings → Subscription `/settings/subscription` | `subscriptions/` (404 → none), `pricing/`, `subscriptions/checkout/` (idempotent), `subscriptions/payments/{reference}/` | Current plan card (trial/expired states) + pricing grid. Checkout is owner-only: 200 opens `authorization_url` in a new tab and stores `?reference=`; 503 keeps the returned reference too (the pending `SubscriptionPayment` exists — gap #28). The tracker polls the reference every 5 s and invalidates the subscription on success.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+`/settings` and `/settings/profile` redirect to `/settings/general`; the tab strip in `SettingsLayout`
+only lists tabs the principal can open and each tab is additionally route-guarded.
+
 ## 8. Verifying against the real API
 
 The backend needs PostgreSQL + FreeRADIUS in production. For frontend verification a
@@ -266,7 +286,11 @@ module that swaps the database, a SQL file that creates the unmanaged `rad*` tab
 script with one user per role — `admin`, `owner`, `manager`, `staff`, `pstaff` (2 tenants),
 `pstaff1` (1 tenant), `agent`, `agent2` (pending), `nobody`).
 
-`npm run test:integration` runs `src/integration/*.integration.test.tsx` against `127.0.0.1:8000`
+`npm run test:integration` runs `src/integration/*.integration.test.tsx` against `127.0.0.1:8000`.
+A Vitest `globalSetup` (`vitest.liveSetup.ts`) signs the harness users in **once** and shares the
+token pairs with every file (`liveTokens()` / `asLiveUser()` in `src/test/liveSession.ts`), so a
+full run only spends ~5 of the 10/min anonymous login budget; if a run follows another too closely
+the setup waits out the `Retry-After` once. It
 and has confirmed: login/refresh rotation + blacklist, `problem` envelopes, field-error shapes,
 `X-Tenant-ID` gating for platform staff, agent login shape, `Idempotency-Replayed` replay and 409 on
 payload mismatch, the login throttle (`LIVE_API_THROTTLE=1`, consumes the 10/min budget), plan CRUD,
@@ -277,6 +301,13 @@ create → state-machine transitions (invalid → 400) → health/checks/audit �
 → replace-secrets (stale 409, wrong password 400, success) → delete, deployed router delete → 409,
 agent create (duplicate → field error) → approve → edit → suspend → filtered list, device MAC
 normalisation → filters → patch → delete, and staff receiving 403 on manager-only endpoints.
+Phase 6 (`phase6.integration.test.tsx`) adds: transactions list/filter/search/detail (staff 200,
+recovery/audit 403), recovery retry → 503, deliver 409 guards (“only fulfilled”, “acknowledge”) and
+202 with the acknowledgement flag, audit filters by action/actor/resource, profile + billing PATCH
+round-trips (keys never echoed, commission > 100 → field error), team add (missing `tenant` → 400,
+duplicate → field error) → role change → last-owner 400 → manager 403 → remove, subscription 404 →
+pricing → checkout 503 with a pollable pending reference (manager 403), and a change-password
+round-trip. Paystack is unreachable from the harness, so retry and checkout always end in 503 there.
 
 ---
 
@@ -289,7 +320,8 @@ normalisation → filters → patch → delete, and staff receiving 403 on manag
 | 3     | ✅     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation), SQLite harness, live tests.           |
 | 4     | ✅     | Dashboard, plans, vouchers (generate/print/detail), live sessions.                                                           |
 | 5     | ✅     | Routers (list/register/detail/operations), agents (directory/detail), devices. 109 unit + 21 live tests.                     |
-| 6–11  | ⏳     | Payments & recovery, audit log, settings/team/subscription; agent portal; public storefront; platform admin; hardening.      |
+| 6     | ✅     | Payments + recovery board, audit log, settings (general/account, billing, team, subscription). 132 unit + 28 live tests.     |
+| 7–11  | ⏳     | Agent portal; public storefront; platform admin; hardening.                                                                  |
 
 ### Toolchain notes
 
