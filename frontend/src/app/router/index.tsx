@@ -14,6 +14,7 @@ import { PlatformLayout } from '@/app/shell/PlatformLayout';
 import { AgentLayout } from '@/app/shell/AgentLayout';
 import { NotFoundPage } from '@/app/shell/NotFoundPage';
 import { ComingSoon } from '@/app/shell/ComingSoon';
+import { RequireCapability } from '@/app/auth/RequireCapability';
 
 /* ---------- lazily loaded pages (one chunk per page) ---------- */
 const LoginPage = lazyRoute(lazy(() => import('@/features/auth/pages/LoginPage')));
@@ -29,6 +30,17 @@ const AcceptInvitationPage = lazyRoute(
 const SelectTenantPage = lazyRoute(lazy(() => import('@/features/auth/pages/SelectTenantPage')));
 const NoAccessPage = lazyRoute(lazy(() => import('@/features/auth/pages/NoAccessPage')));
 
+const DashboardPage = lazyRoute(lazy(() => import('@/features/dashboard/pages/DashboardPage')));
+const SessionsPage = lazyRoute(lazy(() => import('@/features/sessions/pages/SessionsPage')));
+const PlansPage = lazyRoute(lazy(() => import('@/features/plans/pages/PlansPage')));
+const VouchersPage = lazyRoute(lazy(() => import('@/features/vouchers/pages/VouchersPage')));
+const GenerateVouchersPage = lazyRoute(
+  lazy(() => import('@/features/vouchers/pages/GenerateVouchersPage')),
+);
+const VoucherDetailPage = lazyRoute(
+  lazy(() => import('@/features/vouchers/pages/VoucherDetailPage')),
+);
+
 const devRoutes: RouteObject[] = import.meta.env.DEV
   ? [
       {
@@ -40,11 +52,27 @@ const devRoutes: RouteObject[] = import.meta.env.DEV
 
 /* ---------- workspace (tenant members + platform staff) ---------- */
 const workspaceRoutes: RouteObject[] = [
-  { index: true, element: <ComingSoon title="Dashboard" phase={4} /> },
+  { index: true, Component: DashboardPage },
   { path: 'dashboard', element: <Navigate to="/" replace /> },
-  { path: 'sessions', element: <ComingSoon title="Live sessions" phase={4} /> },
-  { path: 'plans', element: <ComingSoon title="Plans" phase={4} /> },
-  { path: 'vouchers/*', element: <ComingSoon title="Vouchers" phase={4} /> },
+  {
+    element: <RequireCapability capability="sessions.view" />,
+    children: [{ path: 'sessions', Component: SessionsPage }],
+  },
+  {
+    element: <RequireCapability capability="plans.view" />,
+    children: [{ path: 'plans', Component: PlansPage }],
+  },
+  {
+    element: <RequireCapability capability="vouchers.view" />,
+    children: [
+      { path: 'vouchers', Component: VouchersPage },
+      { path: 'vouchers/:id', Component: VoucherDetailPage },
+    ],
+  },
+  {
+    element: <RequireCapability capability="vouchers.generate" />,
+    children: [{ path: 'vouchers/generate', Component: GenerateVouchersPage }],
+  },
   { path: 'payments/*', element: <ComingSoon title="Payments" phase={6} /> },
   { path: 'routers/*', element: <ComingSoon title="Routers" phase={5} /> },
   { path: 'agents/*', element: <ComingSoon title="Agents" phase={5} /> },

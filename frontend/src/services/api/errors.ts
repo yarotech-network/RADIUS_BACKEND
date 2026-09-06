@@ -108,6 +108,13 @@ function extractFields(body: ApiErrorBody): Record<string, string[]> {
   return fields;
 }
 
+/** Backend fallbacks that carry no information; prefer a field/detail message when present. */
+const GENERIC_PROBLEM_MESSAGES = new Set([
+  'The request could not be completed.',
+  'Check the submitted fields.',
+  'Invalid input.',
+]);
+
 function extractMessage(
   status: number,
   body: ApiErrorBody | null,
@@ -115,16 +122,18 @@ function extractMessage(
 ) {
   const kind = kindFromStatus(status);
   if (!body) return GENERIC_MESSAGES[kind];
+  // DRF `ValidationError("text")` raised in a view arrives as `detail: ["text"]` with the generic
+  // problem message; the specific text is the useful part.
+  const detailList = Array.isArray(body.detail) ? toStringArray(body.detail) : [];
+  const specific = detailList[0] ?? fields['non_field_errors']?.[0] ?? fields['detail']?.[0];
   const candidates = [body.problem?.message, body.detail, body.error, body.message];
   for (const candidate of candidates) {
     if (typeof candidate === 'string' && candidate.trim()) {
-      if (candidate === 'Check the submitted fields.' && fields['non_field_errors']?.[0]) {
-        return fields['non_field_errors'][0];
-      }
+      if (GENERIC_PROBLEM_MESSAGES.has(candidate) && specific) return specific;
       return candidate;
     }
   }
-  if (fields['non_field_errors']?.[0]) return fields['non_field_errors'][0];
+  if (specific) return specific;
   return GENERIC_MESSAGES[kind];
 }
 

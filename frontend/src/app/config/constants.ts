@@ -5,7 +5,7 @@ export const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 export const SEARCH_DEBOUNCE_MS = 350;
 
 /** Polling cadence for live operations (router provisioning, payment deliveries, return pages). */
-export const LIVE_POLL_INTERVAL_MS = 3000;
+export const LIVE_POLL_INTERVAL_MS = 10_000;
 export const SESSIONS_AUTO_REFRESH_MS = 30_000;
 
 export const STORAGE_KEYS = {
