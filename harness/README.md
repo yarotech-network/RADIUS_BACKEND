@@ -20,6 +20,7 @@ python manage.py runserver 127.0.0.1:8000
 Then in `frontend/`: `npm run dev` (proxies `/api` to :8000) and `npm run test:integration`.
 
 Notes
+
 - `weasyprint` is not installed → `vouchers/pdf/` answers 503, which is exactly the fallback path the UI must handle.
 - Paystack / WireGuard / SSH / SMTP are not configured → the related commands return their documented 503/409 responses.
 - Throttles are left on so 429 handling can be checked (`LIVE_API_THROTTLE=1 npm run test:integration`).

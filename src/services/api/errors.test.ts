@@ -46,6 +46,26 @@ describe('apiErrorFromResponse', () => {
     expect(err.hasFieldErrors).toBe(true);
   });
 
+  it('prefers the specific view ValidationError text over the generic problem message', () => {
+    // Real shape from PATCH vouchers/{id}/ on an issued voucher (verified against the API).
+    const err = apiErrorFromResponse(
+      400,
+      {
+        detail: ['Issued or purchased vouchers cannot be edited; use disable instead.'],
+        problem: {
+          code: 'http_400',
+          message: 'The request could not be completed.',
+          fields: {
+            detail: ['Issued or purchased vouchers cannot be edited; use disable instead.'],
+          },
+        },
+      },
+      new Headers(),
+    );
+    expect(err.message).toBe('Issued or purchased vouchers cannot be edited; use disable instead.');
+    expect(err.fields).toEqual({});
+  });
+
   it('falls back to legacy detail/error keys when there is no envelope', () => {
     expect(
       apiErrorFromResponse(

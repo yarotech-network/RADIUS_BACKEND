@@ -9,6 +9,7 @@ from apps.vouchers.models import InternetPlan, Voucher
 from apps.agents.models import AgentProfile, AgentWallet
 from apps.accounts.staff_models import StaffAssignment
 from apps.routers.models import NASDevice
+from apps.routers.secret_store import secret_store
 from apps.subscriptions.models import SubscriptionPlan
 
 User = get_user_model()
@@ -65,8 +66,8 @@ if not Voucher.objects.filter(tenant=wuse).exists():
                                generation_source="admin", expires_at=(timezone.now() + timedelta(hours=plan.duration_hours)) if status == "active" else None,
                                activated_at=timezone.now() - timedelta(hours=1) if status in ("active", "expired") else None)
 
-NASDevice.objects.get_or_create(tenant=wuse, name="mikrotik-wuse-01", defaults={"ip_address": "10.100.100.12", "nas_secret": "enc:v1:placeholder", "location": "Wuse 2, Abuja", "onboarding_state": "active", "deployment_status": "deployed", "routeros_username": "admin"})
-NASDevice.objects.get_or_create(tenant=wuse, name="mikrotik-wuse-02", defaults={"ip_address": "10.100.100.13", "nas_secret": "enc:v1:placeholder", "location": "Jabi", "onboarding_state": "waiting_for_vpn"})
+NASDevice.objects.get_or_create(tenant=wuse, name="mikrotik-wuse-01", defaults={"ip_address": "10.100.100.12", "nas_secret": secret_store.encrypt("testing-shared-secret"), "location": "Wuse 2, Abuja", "onboarding_state": "active", "deployment_status": "deployed", "routeros_username": "admin"})
+NASDevice.objects.get_or_create(tenant=wuse, name="mikrotik-wuse-02", defaults={"ip_address": "10.100.100.13", "nas_secret": secret_store.encrypt("testing-shared-secret"), "location": "Jabi", "onboarding_state": "waiting_for_vpn"})
 SubscriptionPlan.objects.get_or_create(name="Starter", defaults={"price": 1_500_000, "duration_days": 30, "features": ["1 router", "Unlimited vouchers"], "is_active": True})
 SubscriptionPlan.objects.get_or_create(name="Business", defaults={"price": 4_500_000, "duration_days": 30, "features": ["5 routers", "Agents", "WhatsApp delivery"], "is_active": True})
 print("seeded. password for all users:", PW)

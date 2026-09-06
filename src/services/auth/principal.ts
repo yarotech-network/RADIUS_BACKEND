@@ -48,6 +48,15 @@ export function derivePrincipal(
   }
 }
 
+/** Human label of the tenant the principal is working in (members only; staff use tenantLabel()). */
+export function workspaceName(principal: Principal | null): string | null {
+  if (!principal) return null;
+  if (principal.kind === 'member') return principal.tenantName || null;
+  if (principal.kind === 'platform_staff' && principal.activeTenantId !== null)
+    return `Tenant #${principal.activeTenantId}`;
+  return null;
+}
+
 /** Where this principal should land after sign-in. */
 export function homePathFor(principal: Principal): string {
   switch (principal.kind) {

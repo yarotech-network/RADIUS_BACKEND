@@ -7,7 +7,8 @@ React 19 · TypeScript (strict) · Vite 7 · Tailwind CSS v4 · React Router v7 
 > implementation phase. The original analysis (backend audit, API → feature map, design system,
 > API gaps, phase plan) lives in [`analysis/`](./analysis/README.md).
 
-**Status:** Phases 2 (Foundation) and 3 (Shell & auth) complete. Phases 4–11 pending — see
+**Status:** Phases 2 (Foundation), 3 (Shell & auth) and 4 (Core operations) complete. Phases 5–11
+pending — see
 [`analysis/06_IMPLEMENTATION_PHASES.md`](./analysis/06_IMPLEMENTATION_PHASES.md).
 
 ---
@@ -156,6 +157,22 @@ Navigation items declare the capabilities that make them visible (`app/navigatio
 `visibleGroups()` filters per principal, so tenant staff never see Agents/Audit/Settings and platform
 staff only see the areas their grants cover. Platform staff get a tenant switcher in the top bar.
 
+### Feature module pattern (`features/<name>/`)
+
+```
+api.ts          endpoint calls only (paths, params, response types) — no React
+queries.ts      TanStack Query keys + hooks (useX / useCreateX …); invalidation lives here
+*Schema.ts      zod form schemas + form⇄API mappers (naira→kobo, MB→data_limit …)
+*Rules.ts       pure business rules mirrored from the backend (e.g. which vouchers are editable)
+components/     feature-specific UI (forms, pickers, row actions)
+pages/          route components (default export, lazy-loaded); own URL state via useListParams
+```
+
+Pages never call `http` directly; forms use `useFormSubmit()` (`lib/forms`) so API field errors
+land on the right input and throttling is reported consistently. Commands that create or mutate
+send an `Idempotency-Key` minted once per form instance (`newIdempotencyKey`), so a retried submit
+replays instead of duplicating.
+
 ### Principal & capabilities (`services/auth/principal.ts`)
 
 `Principal` is a discriminated union: `platform_admin | member(owner|manager|staff) | agent | platform_staff | none`.
@@ -204,7 +221,22 @@ Tokens live in `src/styles/index.css` (`@theme`) and are documented in
   no-role, wrong password, 429 countdown, redirect-back, sign-out, expired refresh) and the
   responsive shells (bottom bar, drawer, collapse persistence, skip link).
 
-## 7. Verifying against the real API
+## 7. Core operations (Phase 4)
+
+| Screen                        | Endpoints                                                                     | Notes                                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Dashboard `/`                 | `dashboard/stats/`, `dashboard/live-users/?page_size=1`                       | Six stat cards, recovery alert for paid-unfulfilled orders (managers), quick links. No trends (gap #6).        |
+| Plans `/plans`                | `plans/` CRUD                                                                 | Search/`is_active`/ordering in URL; drawer form (duration presets, ₦ → kobo); delete falls back to deactivate. |
+| Vouchers `/vouchers`          | `vouchers/` (+`status`,`plan`,`search`,`ordering`), `disable/`, `print/`      | Status tabs, plan filter, row menu gated by state (`voucherRules.ts`), multi-select → **one print sheet**.     |
+| Generate `/vouchers/generate` | `vouchers/generate/` (idempotent)                                             | Plan picker + quantity presets + prefix; result screen lists usernames and offers **Print all**.               |
+| Voucher `/vouchers/:id`       | `vouchers/{id}/`, `PATCH`, `DELETE`, `disable/`                               | Edit only when pristine (`?edit=1` drawer), type-to-confirm delete.                                            |
+| Sessions `/sessions`          | `dashboard/live-users/` (10 s polling, pausable), `…/disconnect/`, `routers/` | Router filter, username search, disconnect with confirmation; 503 when CoA is unreachable is shown as-is.      |
+
+Printing: the server only reveals passwords through the per-voucher HTML page. `features/vouchers/printing.ts`
+parses each page and renders a 2-column A4 sheet (`buildPrintSheet`) into a hidden iframe (`printHtml`),
+fetching sequentially with progress and collecting failures instead of aborting.
+
+## 8. Verifying against the real API
 
 The backend needs PostgreSQL + FreeRADIUS in production. For frontend verification a
 **SQLite harness** runs the unmodified Django code (`radius-harness/` outside the repo: a settings
@@ -215,11 +247,14 @@ script with one user per role — `admin`, `owner`, `manager`, `staff`, `pstaff`
 `npm run test:integration` runs `src/integration/*.integration.test.tsx` against `127.0.0.1:8000`
 and has confirmed: login/refresh rotation + blacklist, `problem` envelopes, field-error shapes,
 `X-Tenant-ID` gating for platform staff, agent login shape, `Idempotency-Replayed` replay and 409 on
-payload mismatch, and the login throttle (`LIVE_API_THROTTLE=1`, consumes the 10/min budget).
+payload mismatch, the login throttle (`LIVE_API_THROTTLE=1`, consumes the 10/min budget), plan CRUD,
+the voucher lifecycle (generate → print parse → disable → edit/delete rules → 404), live-users
+filtering/validation, disconnect → 503 without a reachable NAS, and the Phase 4 pages rendering live
+data (`pages.integration.test.tsx`).
 
 ---
 
-## 8. Phase log
+## 9. Phase log
 
 | Phase | Status | Notes                                                                                                                        |
 | ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
