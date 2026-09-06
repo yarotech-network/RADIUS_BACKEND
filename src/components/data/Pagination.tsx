@@ -46,6 +46,7 @@ export function Pagination({
             <Select
               size="sm"
               className="w-20"
+              aria-label="Rows per page"
               value={String(pageSize)}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}

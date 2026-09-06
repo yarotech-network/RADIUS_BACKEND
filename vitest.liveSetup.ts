@@ -4,7 +4,7 @@
  * whole run stays under the backend's anonymous login throttle (10/min per IP). No-op unless
  * LIVE_API=1.
  */
-import { LIVE_USERS, type LiveTokens } from './src/test/liveUsers';
+import { AGENT_LIVE_USERS, LIVE_USERS, type LiveTokens, type LiveUser } from './src/test/liveUsers';
 
 const PASSWORD = 'Passw0rd!2026';
 
@@ -14,8 +14,8 @@ export default async function setup(project: {
   if (process.env.LIVE_API !== '1') return;
   const base = process.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1';
   const tokens: LiveTokens = {};
-  const login = (username: string) =>
-    fetch(`${base}/auth/login/`, {
+  const login = (username: LiveUser) =>
+    fetch(`${base}/${AGENT_LIVE_USERS.includes(username) ? 'agent/login/' : 'auth/login/'}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password: PASSWORD }),

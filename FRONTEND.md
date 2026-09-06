@@ -228,8 +228,15 @@ Tokens live in `src/styles/index.css` (`@theme`) and are documented in
   409 acknowledgement → resend with flag, platform staff without `payments.support` read-only),
   audit (labels/tones, “You”/“User #n”/“System”, details expansion, action/actor filters) and the
   settings tabs (partial PATCHes, write-only Paystack keys, add-by-user-ID with `tenant`, last-owner
-  guards, 404 → “no subscription”, checkout 503 → reference polling). MSW picks the **first**
-  matching handler, so per-test overrides must be listed before shared defaults in `server.use()`.
+  guards, 404 → “no subscription”, checkout 503 → reference polling), the agent portal (storefront
+  connect + 404 slug, sell with charge preview / insufficient-balance guard / plan-field error /
+  usernames-only result, wallet fund dialog with quick amounts + floor/ceiling errors + Paystack
+  redirect + return polling, vouchers status filter, profile diff-PATCH) and the public storefront
+  (catalogue, checkout validation + idempotent `buy/` + 503 handling + missing plan, payment result
+  pending → success / failed / 404 / no-reference fallback, pricing active-only). MSW picks the
+  **first** matching handler, so per-test overrides must be listed before shared defaults in
+  `server.use()`. Tests that exercise a Paystack redirect stub `window.location` (`vi.spyOn(window,
+'location', 'get')`) and assert on `assign()`.
 
 ## 7. Core operations (Phase 4)
 
@@ -278,19 +285,43 @@ their service grants. Viewer-only principals never call the manager-only operati
 `/settings` and `/settings/profile` redirect to `/settings/general`; the tab strip in `SettingsLayout`
 only lists tabs the principal can open and each tab is additionally route-guarded.
 
+## 7d. Agent portal & public storefront (Phase 7)
+
+The agent portal (`/agent/*`, `AgentLayout`: top bar + bottom tabs, single column ≤ 48 rem) is
+phone-first because agents sell from shops. Every call goes through `features/agent/api.ts`
+(`agentPortalApi`) with `tenantId: null` — agents have no membership, so no `X-Tenant-ID` is ever
+sent. The public pages (`features/storefront/`) use `anonymous: true` and work with or without a
+session.
+
+| Screen                                            | Endpoints                                                                                                         | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home `/agent`                                     | `agents/me/`, `agent/dashboard/`, `agent/vouchers/history/?page_size=5`                                           | Balance (dark-blue stat), sold today / total, two primary actions (Sell, Fund → `/agent/wallet?fund=1`), last five sales. The **Commission this month** card is only rendered when the value is > 0 because the backend never computes it (gap #5). If no storefront is connected yet the connect card is shown inline.                                                                                                                                                                                                                                                                                                                        |
+| Sell `/agent/sell`                                | `public/tenants/<slug>/plans/` (catalogue), `agent/wallet/balance/`, `POST agent/vouchers/generate/` (idempotent) | **Gap #1:** agents get 403 on `plans/` and the API never tells them their tenant's slug, so the portal asks once for the operator's storefront link (`StoreLinkForm` → verified with `public/tenants/<slug>/`, stored in `localStorage` `yr.agent.storeSlug`, `useStoreSlug()`). Plans render as radio cards; quantity 1–100; the wallet charge (price × quantity) is previewed and the button is disabled when it exceeds the balance. Errors: `plan_id` field error (plan not in the agent's tenant/inactive), `Insufficient wallet balance` → warning with a funding link. One `Idempotency-Key` per attempt, rotated after every response. |
+| Sale result (same page)                           | —                                                                                                                 | Lists **usernames only** with copy buttons (single/all) and a print action, and states plainly that passwords are issued by the operator — **gap #2**: the generate response carries no credentials and agents cannot call `vouchers/{id}/print/`.                                                                                                                                                                                                                                                                                                                                                                                             |
+| Wallet `/agent/wallet` (+ `/agent/wallet/return`) | `agent/wallet/balance/`, `agent/wallet/payments/?status&reference`, `POST agent/wallet/fund/` (idempotent)        | Balance stat + top-up history (status filter, pagination). **Fund** dialog (`?fund=1`): quick amounts ₦1 000–₦10 000, naira input → kobo, local floor ₦500; the tenant ceiling comes back as an `amount` field error. 200 → `window.location.assign(authorization_url)` after saving the reference locally (`pendingCheckout`, key `yr.checkout.pending`); 503 → warning with the reference (a pending row exists — same pattern as subscriptions). `FundingTracker` polls `?reference=` every 5 s until success/failed. `/agent/wallet/return` (Paystack return URL, gap #9) restores the reference from the URL or from local storage.       |
+| My vouchers `/agent/vouchers`                     | `agent/vouchers/history/?status=`                                                                                 | Allocation history (username, amount charged, “Paid from wallet / On credit / Free”, sold time) with the voucher-status filter the API supports. Footer explains where passwords come from.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Profile `/agent/profile`                          | `agents/me/`, `PATCH agents/{id}/` (phone, shop_name), `auth/change-password/` → `agent/login/`                   | Account facts (status badge, commission rate read-only, agent id), shop form (diff-only PATCH; `commission_rate` is ignored by the serializer), connected storefront card (verify/disconnect), password change (shared `ChangePasswordForm` with `loginKind="agent"` so the re-login after `CHECK_REVOKE_TOKEN` uses `agent/login/`), sign out.                                                                                                                                                                                                                                                                                                |
+| Storefront `/s/:slug`                             | `public/tenants/<slug>/`, `public/tenants/<slug>/plans/?ordering=price&page_size=100`                             | Operator name + plan cards (price, validity, data, speed). 404 slug → dedicated not-found screen; plans are only requested once the tenant resolves. Empty catalogue → empty state.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Checkout `/s/:slug/checkout/:planId`              | `POST buy/` (idempotent, anonymous)                                                                               | Email required (receipt + credentials), name/phone optional, order summary card. 200 → save `{kind:'voucher', reference, slug}` locally and redirect to Paystack; 503 → “temporarily unavailable” with the reference, key rotated; unknown plan → “no longer available”.                                                                                                                                                                                                                                                                                                                                                                       |
+| Payment result `/pay/result?reference=`           | `payments/callback/?reference=`                                                                                   | Polls every 5 s while `pending` (manual “Check again”), then: **success** → voucher username + copy + “password arrives by email”; **failed/abandoned** → not charged; 404 → “could not find this payment”. Accepts `trxref` too and falls back to the locally remembered voucher checkout when Paystack drops the query string; clears it once settled.                                                                                                                                                                                                                                                                                       |
+| Pricing `/pricing`                                | `pricing/`                                                                                                        | Active platform plans with features and a **Get started** → `/register` CTA (read-only catalogue).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+Money never originates in the frontend: every amount shown comes from the API in kobo, the only
+client-side arithmetic is the sale preview (`sellCost`) which the backend re-validates.
+
 ## 8. Verifying against the real API
 
 The backend needs PostgreSQL + FreeRADIUS in production. For frontend verification a
 **SQLite harness** runs the unmodified Django code (`radius-harness/` outside the repo: a settings
 module that swaps the database, a SQL file that creates the unmanaged `rad*` tables, and a seed
 script with one user per role — `admin`, `owner`, `manager`, `staff`, `pstaff` (2 tenants),
-`pstaff1` (1 tenant), `agent`, `agent2` (pending), `nobody`).
+`pstaff1` (1 tenant), `agent` (active, wallet seeded), `agent2` (pending), `nobody`).
 
 `npm run test:integration` runs `src/integration/*.integration.test.tsx` against `127.0.0.1:8000`.
 A Vitest `globalSetup` (`vitest.liveSetup.ts`) signs the harness users in **once** and shares the
-token pairs with every file (`liveTokens()` / `asLiveUser()` in `src/test/liveSession.ts`), so a
-full run only spends ~5 of the 10/min anonymous login budget; if a run follows another too closely
-the setup waits out the `Retry-After` once. It
+token pairs with every file (`liveTokens()` / `asLiveUser()` in `src/test/liveSession.ts`; the
+`agent` user signs in through `agent/login/`), so a full run only spends ~8 of the 10/min anonymous
+login budget; if a run follows another too closely the setup waits out the `Retry-After` once. It
 and has confirmed: login/refresh rotation + blacklist, `problem` envelopes, field-error shapes,
 `X-Tenant-ID` gating for platform staff, agent login shape, `Idempotency-Replayed` replay and 409 on
 payload mismatch, the login throttle (`LIVE_API_THROTTLE=1`, consumes the 10/min budget), plan CRUD,
@@ -307,21 +338,30 @@ recovery/audit 403), recovery retry → 503, deliver 409 guards (“only fulfill
 round-trips (keys never echoed, commission > 100 → field error), team add (missing `tenant` → 400,
 duplicate → field error) → role change → last-owner 400 → manager 403 → remove, subscription 404 →
 pricing → checkout 503 with a pollable pending reference (manager 403), and a change-password
-round-trip. Paystack is unreachable from the harness, so retry and checkout always end in 503 there.
+round-trip. Phase 7 (`phase7.integration.test.tsx`, agent session) adds: profile/stats/wallet/history
+agreeing on one balance, the public tenant + plans (ordering/search) + 404 slug + anonymous pricing,
+agent generate (wallet debited by price × quantity, usernames only, `Idempotency-Replayed` on the
+same key, foreign plan → `plan_id` field error, quantity 101 → 400), funding floor/ceiling errors and
+503 with a pending top-up findable by reference, public `buy/` → 503 with a pending reference that
+`payments/callback/` reports as `pending` (known references → `success` + voucher / 404), agent
+self-PATCH (other agents 404, `plans/` 403, manager → 403 on agent endpoints) and the agent/storefront
+pages rendering live data. Paystack is unreachable from the harness, so retry, checkout, funding and
+buy always end in 503 there.
 
 ---
 
 ## 9. Phase log
 
-| Phase | Status | Notes                                                                                                                        |
-| ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 1     | ✅     | Analysis approved (`analysis/`).                                                                                             |
-| 2     | ✅     | Toolchain, tokens, API types, http/auth services, formatting/validation libs, component library, dev gallery, 43 unit tests. |
-| 3     | ✅     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation), SQLite harness, live tests.           |
-| 4     | ✅     | Dashboard, plans, vouchers (generate/print/detail), live sessions.                                                           |
-| 5     | ✅     | Routers (list/register/detail/operations), agents (directory/detail), devices. 109 unit + 21 live tests.                     |
-| 6     | ✅     | Payments + recovery board, audit log, settings (general/account, billing, team, subscription). 132 unit + 28 live tests.     |
-| 7–11  | ⏳     | Agent portal; public storefront; platform admin; hardening.                                                                  |
+| Phase | Status | Notes                                                                                                                                           |
+| ----- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | ✅     | Analysis approved (`analysis/`).                                                                                                                |
+| 2     | ✅     | Toolchain, tokens, API types, http/auth services, formatting/validation libs, component library, dev gallery, 43 unit tests.                    |
+| 3     | ✅     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation), SQLite harness, live tests.                              |
+| 4     | ✅     | Dashboard, plans, vouchers (generate/print/detail), live sessions.                                                                              |
+| 5     | ✅     | Routers (list/register/detail/operations), agents (directory/detail), devices. 109 unit + 21 live tests.                                        |
+| 6     | ✅     | Payments + recovery board, audit log, settings (general/account, billing, team, subscription). 132 unit + 28 live tests.                        |
+| 7     | ✅     | Agent portal (home, sell, wallet + Paystack return, vouchers, profile) and public storefront/checkout/result/pricing. 157 unit + 35 live tests. |
+| 8–11  | ⏳     | Platform admin console; performance, responsive & a11y hardening; production readiness.                                                         |
 
 ### Toolchain notes
 
