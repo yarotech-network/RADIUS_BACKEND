@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import type { NavGroup } from '@/app/navigation/navConfig';
+import { prefetchRoute } from '@/app/navigation/prefetch';
 import { cn } from '@/lib/utilities/cn';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -15,6 +17,7 @@ export function SidebarNav({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
+  const queryClient = useQueryClient();
   return (
     <nav
       aria-label="Primary"
@@ -35,6 +38,8 @@ export function SidebarNav({
                   to={item.to}
                   end={item.end ?? false}
                   onClick={onNavigate}
+                  onMouseEnter={() => prefetchRoute(item.to, queryClient)}
+                  onFocus={() => prefetchRoute(item.to, queryClient)}
                   className={({ isActive }) =>
                     cn(
                       'group flex h-10 items-center gap-3 rounded-control px-3 text-sm font-medium transition-colors',

@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import { dashboardKeys } from '@/features/dashboard/queries';
 import type { DeliverRequest, PaymentListParams, RecoveryListParams } from '@/types/api';
 import { paymentsApi } from './api';
@@ -15,12 +16,25 @@ export const paymentKeys = {
   deliveries: (paymentId: number) => [...paymentKeys.all, 'deliveries', paymentId] as const,
 };
 
-export function usePayments(params: PaymentListParams) {
-  return useQuery({
+/** Initial `/payments` list params (ordering matches PaymentsPage). */
+export const PAYMENTS_DEFAULT_ORDERING = '-created_at';
+export const PAYMENTS_LIST_DEFAULT_PARAMS: PaymentListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+  ordering: PAYMENTS_DEFAULT_ORDERING,
+};
+
+/** Options shared by the hook and navigation prefetch (phase 9). */
+export function paymentsListQuery(params: PaymentListParams) {
+  return {
     queryKey: paymentKeys.list(params),
     queryFn: () => paymentsApi.list(params),
-    placeholderData: keepPreviousData,
-  });
+    staleTime: 30_000,
+  };
+}
+
+export function usePayments(params: PaymentListParams) {
+  return useQuery({ ...paymentsListQuery(params), placeholderData: keepPreviousData });
 }
 
 export function usePayment(id: number) {

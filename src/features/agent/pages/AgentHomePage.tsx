@@ -6,7 +6,12 @@ import { Section, StatusBadge } from '@/components/layout';
 import { ButtonLink, Skeleton } from '@/components/ui';
 import { formatKobo } from '@/lib/formatting/money';
 import { formatRelative } from '@/lib/formatting/dates';
-import { useAgentMe, useAgentStats, useAllocationHistory } from '../queries';
+import {
+  AGENT_RECENT_HISTORY_PARAMS,
+  useAgentMe,
+  useAgentStats,
+  useAllocationHistory,
+} from '../queries';
 import { useStoreSlug } from '../storeSlug';
 import { AgentStatsCards } from '../components/AgentStatsCards';
 import { StoreLinkForm } from '../components/StoreLink';
@@ -15,7 +20,7 @@ export default function AgentHomePage() {
   const principal = usePrincipal();
   const me = useAgentMe();
   const stats = useAgentStats();
-  const recent = useAllocationHistory({ page_size: 5 });
+  const recent = useAllocationHistory(AGENT_RECENT_HISTORY_PARAMS);
   const [slug] = useStoreSlug();
 
   useEffect(() => {

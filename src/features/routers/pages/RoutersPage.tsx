@@ -18,7 +18,7 @@ import { can } from '@/services/auth/principal';
 import { usePrincipal } from '@/app/auth/useAuth';
 import type { DeploymentStatus, NasDevice, OnboardingState, RouterListParams } from '@/types/api';
 import { RouterStateBadges } from '../components/RouterStateBadges';
-import { useRouters } from '../queries';
+import { ROUTERS_DEFAULT_ORDERING, useRouters } from '../queries';
 import { ONBOARDING_FILTER_OPTIONS } from '../routerSchemas';
 
 const FILTERS = ['onboarding_state', 'deployment_status', 'is_active'] as const;
@@ -29,7 +29,7 @@ export default function RoutersPage() {
   const principal = usePrincipal();
   const navigate = useNavigate();
   const canManage = can(principal, 'routers.manage');
-  const list = useListParams(FILTERS, { ordering: 'name' });
+  const list = useListParams(FILTERS, { ordering: ROUTERS_DEFAULT_ORDERING });
   const debouncedSearch = useDebouncedValue(list.state.search);
   const params = useMemo<RouterListParams>(() => {
     const p: RouterListParams = { page: list.state.page, page_size: list.state.page_size };

@@ -18,7 +18,7 @@ import { formatKobo } from '@/lib/formatting/money';
 import { useDebouncedValue } from '@/lib/utilities/useDebouncedValue';
 import { can } from '@/services/auth/principal';
 import type { PaymentListParams, PaymentStatus, PaymentTransaction } from '@/types/api';
-import { usePayments } from '../queries';
+import { PAYMENTS_DEFAULT_ORDERING, usePayments } from '../queries';
 import { PAYMENT_STATUS_FILTERS, customerLabel } from '../paymentRules';
 import { PaymentDrawer } from '../components/PaymentDrawer';
 
@@ -28,7 +28,7 @@ export default function PaymentsPage() {
   const principal = usePrincipal();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const list = useListParams(FILTERS, { ordering: '-created_at' });
+  const list = useListParams(FILTERS, { ordering: PAYMENTS_DEFAULT_ORDERING });
   const debouncedSearch = useDebouncedValue(list.state.search);
   const selectedId = Number(params.get('payment')) || null;
   const query = usePayments(

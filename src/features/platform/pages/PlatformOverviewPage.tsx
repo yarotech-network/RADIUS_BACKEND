@@ -6,12 +6,12 @@ import { ErrorState } from '@/components/feedback';
 import { formatKobo } from '@/lib/formatting/money';
 import { formatDateTime, formatRelative } from '@/lib/formatting/dates';
 import { StatusBadge } from '@/components/layout';
-import { usePlatformStats, useTenants } from '../queries';
+import { PLATFORM_RECENT_TENANTS_PARAMS, usePlatformStats, useTenants } from '../queries';
 
 /** `/platform` — cross-tenant KPIs from `platform/dashboard/` plus the newest tenants. */
 export default function PlatformOverviewPage() {
   const stats = usePlatformStats();
-  const recent = useTenants({ page_size: 5, is_platform_admin: false });
+  const recent = useTenants(PLATFORM_RECENT_TENANTS_PARAMS);
   useEffect(() => {
     document.title = 'Platform overview · Yarotech RADIUS';
   }, []);

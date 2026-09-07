@@ -21,7 +21,7 @@ import type { Voucher, VoucherListParams, VoucherStatus } from '@/types/api';
 import { VoucherActions } from '../components/VoucherActions';
 import { VoucherStatusFilter, type VoucherStatusTab } from '../components/VoucherStatusFilter';
 import { usePrintVouchers } from '../hooks/usePrintVouchers';
-import { useDisableVoucher, useVouchers } from '../queries';
+import { VOUCHERS_DEFAULT_ORDERING, useDisableVoucher, useVouchers } from '../queries';
 import { describeSource } from '../voucherRules';
 
 const FILTERS = ['status', 'plan', 'source'] as const;
@@ -33,7 +33,7 @@ export default function VouchersPage() {
   const toast = useToast();
   const canGenerate = can(principal, 'vouchers.generate');
   const canPrint = can(principal, 'vouchers.print');
-  const list = useListParams(FILTERS, { ordering: '-created_at' });
+  const list = useListParams(FILTERS, { ordering: VOUCHERS_DEFAULT_ORDERING });
   const debouncedSearch = useDebouncedValue(list.state.search);
   const params = useMemo<VoucherListParams>(() => {
     const p: VoucherListParams = { page: list.state.page, page_size: list.state.page_size };

@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import type { VoucherGenerateRequest, VoucherListParams, VoucherManualWrite } from '@/types/api';
 import { vouchersApi } from './api';
 import { dashboardKeys } from '@/features/dashboard/queries';
@@ -10,12 +11,25 @@ export const voucherKeys = {
   detail: (id: number) => [...voucherKeys.all, 'detail', id] as const,
 };
 
-export function useVouchers(params: VoucherListParams) {
-  return useQuery({
+/** Initial `/vouchers` list params (ordering matches VouchersPage). */
+export const VOUCHERS_DEFAULT_ORDERING = '-created_at';
+export const VOUCHERS_LIST_DEFAULT_PARAMS: VoucherListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+  ordering: VOUCHERS_DEFAULT_ORDERING,
+};
+
+/** Options shared by the hook and navigation prefetch (phase 9). */
+export function vouchersListQuery(params: VoucherListParams) {
+  return {
     queryKey: voucherKeys.list(params),
     queryFn: () => vouchersApi.list(params),
-    placeholderData: keepPreviousData,
-  });
+    staleTime: 30_000,
+  };
+}
+
+export function useVouchers(params: VoucherListParams) {
+  return useQuery({ ...vouchersListQuery(params), placeholderData: keepPreviousData });
 }
 
 export function useVoucher(id: number) {

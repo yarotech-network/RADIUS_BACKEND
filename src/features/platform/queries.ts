@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import { isApiError } from '@/services/api/errors';
 import type {
   AuditListParams,
@@ -45,19 +46,41 @@ export const platformKeys = {
 const notFound = (error: unknown) => isApiError(error) && error.status === 404;
 
 export function usePlatformStats() {
-  return useQuery({
+  return useQuery(platformStatsQuery());
+}
+
+/** Options shared by the hooks and navigation prefetch (phase 9). */
+export function platformStatsQuery() {
+  return {
     queryKey: platformKeys.stats(),
     queryFn: platformApi.stats,
     staleTime: 30_000,
-  });
+  };
+}
+
+/** Five most recent tenants for the platform overview ticker. */
+export const PLATFORM_RECENT_TENANTS_PARAMS: TenantListParams = {
+  page_size: 5,
+  is_platform_admin: false,
+};
+
+/** Initial `/platform/tenants` list params (default view hides the platform's own tenant). */
+export const TENANTS_LIST_DEFAULT_PARAMS: TenantListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+  is_platform_admin: false,
+};
+
+export function tenantsListQuery(params: TenantListParams) {
+  return {
+    queryKey: platformKeys.tenantList(params),
+    queryFn: () => platformApi.tenants(params),
+    staleTime: 30_000,
+  };
 }
 
 export function useTenants(params: TenantListParams) {
-  return useQuery({
-    queryKey: platformKeys.tenantList(params),
-    queryFn: () => platformApi.tenants(params),
-    placeholderData: keepPreviousData,
-  });
+  return useQuery({ ...tenantsListQuery(params), placeholderData: keepPreviousData });
 }
 
 export function useTenant(id: number | null) {
