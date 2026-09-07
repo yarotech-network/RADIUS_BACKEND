@@ -1,6 +1,11 @@
-import type { ReactNode } from 'react';
+import { type KeyboardEvent, type ReactNode } from 'react';
 import { cn } from '@/lib/utilities/cn';
 
+/**
+ * Radiogroup-styled segmented control with the WAI-ARIA radio keyboard pattern
+ * (phase 10): arrows move focus and select; only the checked option is a tab
+ * stop.
+ */
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -16,10 +21,28 @@ export function SegmentedControl<T extends string>({
   ariaLabel?: string;
   size?: 'sm' | 'md';
 }) {
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const radios = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not([disabled])'),
+    );
+    if (radios.length === 0) return;
+    const current = radios.findIndex((radio) => radio === document.activeElement);
+    let next: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown')
+      next = (current + 1) % radios.length;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
+      next = (current - 1 + radios.length) % radios.length;
+    else return;
+    event.preventDefault();
+    radios[next]?.focus();
+    radios[next]?.click();
+  }
+
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
+      onKeyDown={onKeyDown}
       className={cn('inline-flex rounded-control bg-slate-100 p-0.5', className)}
     >
       {options.map((option) => {
@@ -30,6 +53,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
               'rounded-[calc(var(--radius-control)-2px)] font-medium whitespace-nowrap transition-colors',

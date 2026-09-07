@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { SearchX } from 'lucide-react';
 import { EmptyState } from '@/components/feedback/EmptyState';
@@ -11,6 +12,9 @@ export function NotFoundPage({
   title?: string;
   description?: string;
 }) {
+  useEffect(() => {
+    document.title = 'Page not found · Yarotech RADIUS';
+  }, [title]);
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
       <EmptyState
