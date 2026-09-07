@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router';
 import { useAuth } from '@/app/auth/useAuth';
-import { AuthCard } from '@/app/shell/AuthCard';
+import { AuthSplitLayout } from '@/app/shell/AuthSplitLayout';
 import { Alert } from '@/components/feedback/Alert';
 import { Button, FormField, Input } from '@/components/ui';
 import { authApi } from '@/features/auth/api';
@@ -54,9 +54,16 @@ export default function AgentLoginPage() {
   });
 
   return (
-    <AuthCard
+    <AuthSplitLayout
       title="Agent sign in"
       description="Sell vouchers and manage your wallet."
+      panelTitle="Sell Wi-Fi anywhere"
+      panelDescription="Check wallet balance, sell access codes and track commissions from the agent portal."
+      panelPoints={[
+        'Instant voucher sales with live wallet balance',
+        'Commission tracking on every sale',
+        'Works on any device — phone, tablet or desktop',
+      ]}
       footer={
         <>
           Not an agent?{' '}
@@ -101,6 +108,6 @@ export default function AgentLoginPage() {
           Sign in
         </Button>
       </form>
-    </AuthCard>
+    </AuthSplitLayout>
   );
 }

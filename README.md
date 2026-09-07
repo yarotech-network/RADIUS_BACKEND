@@ -32,12 +32,13 @@ npm run dev                   # http://localhost:5173 — /api and /health are p
 
 ## Configuration
 
-| Variable                     | Default                 | Notes                                                                                                                                    |
-| ---------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_API_BASE_URL`          | `/api/v1`               | Relative when served behind the same origin as Django; full URL for a separate origin (add it to `CORS_ALLOWED_ORIGINS` on the backend). |
-| `VITE_DEV_PROXY_TARGET`      | `http://127.0.0.1:8000` | Dev server only.                                                                                                                         |
-| `VITE_APP_NAME`              | `Yarotech RADIUS`       | Display name.                                                                                                                            |
-| `VITE_ERROR_REPORT_ENDPOINT` | _(empty)_               | Optional production endpoint for error reports (window errors, unhandled rejections, error boundaries). Empty disables remote reporting. |
+| Variable                        | Default                 | Notes                                                                                                                                    |
+| ------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`             | `/api/v1`               | Relative when served behind the same origin as Django; full URL for a separate origin (add it to `CORS_ALLOWED_ORIGINS` on the backend). |
+| `VITE_DEV_PROXY_TARGET`         | `http://127.0.0.1:8000` | Dev server only.                                                                                                                         |
+| `VITE_APP_NAME`                 | `Yarotech RADIUS`       | Display name.                                                                                                                            |
+| `VITE_ERROR_REPORT_ENDPOINT`    | _(empty)_               | Optional production endpoint for error reports (window errors, unhandled rejections, error boundaries). Empty disables remote reporting. |
+| `VITE_FEATURED_STOREFRONT_SLUG` | _(empty)_               | Slug of the storefront whose plans are showcased on the public landing page (`/`). Empty hides the customer plans section.               |
 
 ## Verifying against the real backend
 

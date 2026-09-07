@@ -30,6 +30,8 @@ export interface ApiErrorBody {
   problem?: ApiProblem;
   detail?: string;
   error?: string;
+  /** Machine-readable error code (e.g. `email_not_verified` on login 403). */
+  code?: string;
   message?: string;
   command_id?: string;
   non_field_errors?: string[];

@@ -65,9 +65,9 @@ export function homePathFor(principal: Principal): string {
     case 'agent':
       return '/agent';
     case 'member':
-      return '/';
+      return '/dashboard';
     case 'platform_staff':
-      return principal.activeTenantId ? '/' : '/select-tenant';
+      return principal.activeTenantId ? '/dashboard' : '/select-tenant';
     default:
       return '/no-access';
   }

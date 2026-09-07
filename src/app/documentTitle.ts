@@ -8,7 +8,7 @@
  * NOT set a title themselves.
  */
 const TITLES: Record<string, string> = {
-  '/': 'Overview · Yarotech RADIUS',
+  '/dashboard': 'Overview · Yarotech RADIUS',
   '/sessions': 'Live sessions · Yarotech RADIUS',
   '/plans': 'Plans · Yarotech RADIUS',
   '/vouchers': 'Vouchers · Yarotech RADIUS',

@@ -43,6 +43,21 @@ export interface RegisterRequest {
   phone: string;
 }
 
+/** Registration no longer returns tokens: the account unlocks after the emailed OTP is confirmed. */
+export interface RegisterResponse {
+  user: User;
+  detail: string;
+}
+
+export interface VerifyEmailRequest {
+  email: string;
+  code: string;
+}
+
+export interface ResendVerificationResponse {
+  message: string;
+}
+
 export interface RefreshRequest {
   refresh: string;
 }

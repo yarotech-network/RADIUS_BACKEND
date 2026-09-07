@@ -17,6 +17,8 @@ import { WorkspaceLayout } from '@/app/shell/WorkspaceLayout';
 import { PlatformLayout } from '@/app/shell/PlatformLayout';
 import { AgentLayout } from '@/app/shell/AgentLayout';
 import LoginPage from '@/features/auth/pages/LoginPage';
+import RegisterPage from '@/features/auth/pages/RegisterPage';
+import VerifyEmailPage from '@/features/auth/pages/VerifyEmailPage';
 import AgentLoginPage from '@/features/auth/pages/AgentLoginPage';
 import SelectTenantPage from '@/features/auth/pages/SelectTenantPage';
 import NoAccessPage from '@/features/auth/pages/NoAccessPage';
@@ -33,6 +35,8 @@ const routes: RouteObject[] = [
           { path: '/agent/login', Component: AgentLoginPage },
         ],
       },
+      { path: '/register', Component: RegisterPage },
+      { path: '/verify-email', Component: VerifyEmailPage },
     ],
   },
   {
@@ -72,7 +76,7 @@ const routes: RouteObject[] = [
             path: '/',
             Component: WorkspaceLayout,
             children: [
-              { index: true, element: <h1>Dashboard page</h1> },
+              { path: 'dashboard', element: <h1>Dashboard page</h1> },
               { path: 'vouchers', element: <h1>Vouchers page</h1> },
             ],
           },
@@ -131,7 +135,7 @@ describe('sign in and landing per role', () => {
     await userEvent.type(screen.getByLabelText(/^password/i), 'secret123');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Dashboard page' })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.location.pathname).toBe('/dashboard');
     // Owner sees Settings + Agents; nav rendered in sidebar + drawer, so use getAllBy.
     expect(screen.getAllByRole('link', { name: 'Settings' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Agents' }).length).toBeGreaterThan(0);
@@ -141,7 +145,7 @@ describe('sign in and landing per role', () => {
   it('tenant staff only see read-only navigation', async () => {
     tokenStore.set({ access: 'A', refresh: 'R' });
     mockSession(makeUser('staff'));
-    renderApp('/');
+    renderApp('/dashboard');
     expect(await screen.findByRole('heading', { name: 'Dashboard page' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Agents' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Audit log' })).not.toBeInTheDocument();
@@ -234,7 +238,7 @@ describe('sign in and landing per role', () => {
   it('platform staff with a single assignment skip the picker', async () => {
     tokenStore.set({ access: 'A', refresh: 'R' });
     mockSession(makeUser('platform_staff'), paginated([makeAssignment(10, ['routers.view'])]));
-    renderApp('/');
+    renderApp('/dashboard');
     expect(await screen.findByRole('heading', { name: 'Dashboard page' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Routers' }).length).toBeGreaterThan(0);
   });
@@ -274,13 +278,79 @@ describe('sign in and landing per role', () => {
         return new HttpResponse(null, { status: 205 });
       }),
     );
-    const router = renderApp('/');
+    const router = renderApp('/dashboard');
     await screen.findByRole('heading', { name: 'Dashboard page' });
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(logoutBody).toEqual({ refresh: 'R' });
     expect(tokenStore.hasSession()).toBe(false);
+  });
+
+  it('new tenant registers, confirms the emailed OTP and lands in the workspace', async () => {
+    const user = makeUser('owner');
+    const seenCodes: string[] = [];
+    mockSession(user);
+    server.use(
+      mswHttp.post(`${API}/auth/register/`, () =>
+        HttpResponse.json(
+          { user, detail: 'Verification code sent to your email.' },
+          { status: 201 },
+        ),
+      ),
+      mswHttp.post(`${API}/auth/verify-email/`, async ({ request }) => {
+        seenCodes.push(String(((await request.json()) as { code: string }).code));
+        return HttpResponse.json({ access: 'A', refresh: 'R', user });
+      }),
+    );
+
+    const router = renderApp('/register');
+    await userEvent.type(await screen.findByLabelText(/business name/i), 'New Network');
+    await userEvent.type(screen.getByLabelText(/username/i), 'newowner');
+    await userEvent.type(screen.getByLabelText(/phone/i), '08012345678');
+    await userEvent.type(screen.getByLabelText(/^email/i), 'new@example.com');
+    await userEvent.type(screen.getAllByLabelText(/^password/i)[0]!, 'StrongPass-4821');
+    await userEvent.type(screen.getAllByLabelText(/confirm password/i)[0]!, 'StrongPass-4821');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+
+    // Registration withholds tokens and moves to the OTP step.
+    expect(await screen.findByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/verify-email');
+    expect(screen.getByDisplayValue('new@example.com')).toBeInTheDocument();
+    expect(tokenStore.hasSession()).toBe(false);
+
+    for (let i = 0; i < 6; i++) {
+      await userEvent.type(screen.getByLabelText(`Digit ${i + 1} of 6`), String(i + 1));
+    }
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard page' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/dashboard');
+    expect(seenCodes).toEqual(['123456']);
+    expect(tokenStore.getRefresh()).toBe('R');
+  });
+
+  it('login with an unverified email is redirected to the verification step', async () => {
+    server.use(
+      mswHttp.post(`${API}/auth/login/`, () =>
+        HttpResponse.json(
+          {
+            error: 'Verify your email address before signing in.',
+            code: 'email_not_verified',
+            email: 'pending@example.com',
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    const router = renderApp('/login');
+    await userEvent.type(await screen.findByLabelText(/username/i), 'pending');
+    await userEvent.type(screen.getByLabelText(/^password/i), 'secret123');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/verify-email');
+    expect(screen.getByDisplayValue('pending@example.com')).toBeInTheDocument();
   });
 
   it('expired refresh token on bootstrap lands on login without crashing', async () => {

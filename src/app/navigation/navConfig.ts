@@ -49,7 +49,7 @@ export const WORKSPACE_NAV: NavGroup[] = [
       {
         key: 'dashboard',
         label: 'Dashboard',
-        to: '/',
+        to: '/dashboard',
         icon: LayoutDashboard,
         end: true,
         capabilities: ['dashboard.view'],

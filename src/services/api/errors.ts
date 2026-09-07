@@ -154,7 +154,7 @@ export function apiErrorFromResponse(status: number, body: unknown, headers: Hea
   return new ApiError({
     status,
     message,
-    code: parsed?.problem?.code ?? `http_${status}`,
+    code: parsed?.problem?.code ?? parsed?.code ?? `http_${status}`,
     fields,
     retryAfterSeconds: parseRetryAfter(headers.get('Retry-After')),
     commandId: typeof parsed?.command_id === 'string' ? parsed.command_id : null,

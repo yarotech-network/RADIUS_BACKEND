@@ -18,7 +18,7 @@ import type { QueryClient } from '@tanstack/react-query';
 /** Route chunk loaders — specifiers must match src/app/router/index.tsx. */
 const routeChunks: Record<string, () => Promise<unknown>> = {
   /* workspace */
-  '/': () => import('@/features/dashboard/pages/DashboardPage'),
+  '/dashboard': () => import('@/features/dashboard/pages/DashboardPage'),
   '/sessions': () => import('@/features/sessions/pages/SessionsPage'),
   '/plans': () => import('@/features/plans/pages/PlansPage'),
   '/vouchers': () => import('@/features/vouchers/pages/VouchersPage'),
@@ -47,7 +47,7 @@ export const ROUTE_CHUNK_PATHS: readonly string[] = Object.keys(routeChunks);
 
 /** Routes whose data (not just their chunk) is prefetched on hover/focus. */
 export const QUERY_ROUTE_PATHS: readonly string[] = [
-  '/',
+  '/dashboard',
   '/sessions',
   '/plans',
   '/vouchers',

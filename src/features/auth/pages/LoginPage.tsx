@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useAuth } from '@/app/auth/useAuth';
-import { AuthCard } from '@/app/shell/AuthCard';
+import { AuthSplitLayout } from '@/app/shell/AuthSplitLayout';
 import { Alert } from '@/components/feedback/Alert';
 import { Button, FormField, Input } from '@/components/ui';
 import { authApi } from '@/features/auth/api';
@@ -22,6 +22,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const { signIn, signOutReason } = useAuth();
+  const navigate = useNavigate();
   const submitError = useSubmitError();
 
   const form = useForm<FormValues>({
@@ -43,6 +44,14 @@ export default function LoginPage() {
         submitError.setMessage('Incorrect username or password.');
         return;
       }
+      if (isApiError(error) && error.status === 403 && error.code === 'email_not_verified') {
+        submitError.setMessage(
+          'Your email is not verified yet. Check your inbox for the 6-digit code.',
+        );
+        const email = isApiError(error) ? (error.body?.email as string | undefined) : undefined;
+        navigate('/verify-email', { state: { email: email ?? values.username } });
+        return;
+      }
       if (isApiError(error) && error.kind === 'validation') {
         const leftover = applyApiErrors(error, form.setError, ['username', 'password']);
         if (leftover) submitError.setMessage(leftover);
@@ -53,7 +62,7 @@ export default function LoginPage() {
   });
 
   return (
-    <AuthCard
+    <AuthSplitLayout
       title="Sign in"
       description="Manage your hotspot plans, vouchers and routers."
       footer={
@@ -105,6 +114,6 @@ export default function LoginPage() {
           Sign in
         </Button>
       </form>
-    </AuthCard>
+    </AuthSplitLayout>
   );
 }

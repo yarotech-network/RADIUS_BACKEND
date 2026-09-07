@@ -26,7 +26,9 @@ export default function SelectTenantPage() {
 
   const choose = (tenantId: number) => {
     selectTenant(tenantId);
-    navigate('/', { replace: true });
+    // The workspace overview — homePathFor(principal) would still say /select-tenant
+    // because the context update is async at this point.
+    navigate('/dashboard', { replace: true });
   };
 
   return (
