@@ -22,20 +22,22 @@ npm run dev                   # http://localhost:5173 — /api and /health are p
 | -------------------------- | --------------------------------------------------------------------------- |
 | `npm run dev`              | Vite dev server with API proxy                                              |
 | `npm run typecheck`        | `tsc -b` (strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) |
-| `npm run lint`             | ESLint (typescript-eslint, react-hooks v7, jsx-a11y)                        |
+| `npm run lint`             | ESLint (typescript-eslint, react-hooks, react-refresh)                      |
 | `npm run format`           | Prettier (write)                                                            |
 | `npm test`                 | Unit + component tests (jsdom, MSW — no network)                            |
 | `npm run test:integration` | Contract tests against a live API on `127.0.0.1:8000` (see below)           |
 | `npm run build`            | Production build to `dist/` (route-level code splitting)                    |
 | `npm run analyze`          | Build with a bundle treemap (`stats.html`)                                  |
+| `npm run size-check`       | Enforce bundle budgets on `dist/` (initial JS < 150 kB gzip, lazy < 120 kB) |
 
 ## Configuration
 
-| Variable                | Default                 | Notes                                                                                                                                    |
-| ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_API_BASE_URL`     | `/api/v1`               | Relative when served behind the same origin as Django; full URL for a separate origin (add it to `CORS_ALLOWED_ORIGINS` on the backend). |
-| `VITE_DEV_PROXY_TARGET` | `http://127.0.0.1:8000` | Dev server only.                                                                                                                         |
-| `VITE_APP_NAME`         | `Yarotech RADIUS`       | Display name.                                                                                                                            |
+| Variable                     | Default                 | Notes                                                                                                                                    |
+| ---------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`          | `/api/v1`               | Relative when served behind the same origin as Django; full URL for a separate origin (add it to `CORS_ALLOWED_ORIGINS` on the backend). |
+| `VITE_DEV_PROXY_TARGET`      | `http://127.0.0.1:8000` | Dev server only.                                                                                                                         |
+| `VITE_APP_NAME`              | `Yarotech RADIUS`       | Display name.                                                                                                                            |
+| `VITE_ERROR_REPORT_ENDPOINT` | _(empty)_               | Optional production endpoint for error reports (window errors, unhandled rejections, error boundaries). Empty disables remote reporting. |
 
 ## Verifying against the real backend
 
@@ -58,7 +60,24 @@ src/
 
 ## Deployment
 
-`npm run build` produces static files. Serve `dist/` from Nginx (or any static host) with SPA
-fallback to `index.html`, and either proxy `/api/` to Gunicorn on the same origin or point
-`VITE_API_BASE_URL` at the API origin. Production hardening (CSP, caching headers, health checks)
-is part of the final phase — see the phase log in `FRONTEND.md`.
+`npm run build` produces static files in `dist/`. Two supported modes:
+
+**Docker, same origin as the API (recommended).** A multi-stage `Dockerfile` builds the app and
+serves it with nginx: hashed assets cached immutably, SPA fallback to `index.html`, gzip, and
+`/api/` + `/health` proxied to the Django service.
+
+```bash
+docker build -t yarotech-radius-frontend .
+docker run -e API_UPSTREAM=http://django:8000 -p 8080:80 yarotech-radius-frontend
+# VITE_API_BASE_URL stays at its default /api/v1 — no CORS configuration needed.
+```
+
+**Separate origins.** Host `dist/` on any static host/CDN and build with
+`VITE_API_BASE_URL=https://api.example.com/api/v1`, adding the UI origin to Django's
+`CORS_ALLOWED_ORIGINS`.
+
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check, tests, build and the bundle
+budget gate (`npm run size-check`) on every push and pull request. Runtime error reporting is
+optional — set `VITE_ERROR_REPORT_ENDPOINT` at build time to collect JSON reports for uncaught
+errors. See `FRONTEND.md` §12 for the full production guide and `analysis/perf/` for the current
+bundle measurements.
