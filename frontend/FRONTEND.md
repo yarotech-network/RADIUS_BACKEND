@@ -33,11 +33,12 @@ npm run dev                 # http://localhost:5173  (dev-only UI gallery at /__
 
 ### Environment variables
 
-| Variable                | Default                 | Notes                                                                                                                                                            |
-| ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_API_BASE_URL`     | `/api/v1`               | Relative when Nginx serves UI + API from one origin; absolute (`https://api.example.com/api/v1`) otherwise — add the UI origin to Django `CORS_ALLOWED_ORIGINS`. |
-| `VITE_DEV_PROXY_TARGET` | `http://127.0.0.1:8000` | Dev-server proxy target only.                                                                                                                                    |
-| `VITE_APP_NAME`         | `Yarotech RADIUS`       | Display name.                                                                                                                                                    |
+| Variable                     | Default                 | Notes                                                                                                                                                            |
+| ---------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`          | `/api/v1`               | Relative when Nginx serves UI + API from one origin; absolute (`https://api.example.com/api/v1`) otherwise — add the UI origin to Django `CORS_ALLOWED_ORIGINS`. |
+| `VITE_DEV_PROXY_TARGET`      | `http://127.0.0.1:8000` | Dev-server proxy target only.                                                                                                                                    |
+| `VITE_APP_NAME`              | `Yarotech RADIUS`       | Display name.                                                                                                                                                    |
+| `VITE_ERROR_REPORT_ENDPOINT` | _(empty)_               | Production error-reporting POST endpoint (optional); empty disables remote reporting.                                                                            |
 
 No secrets are ever placed in the frontend. Paystack keys, router secrets and WhatsApp tokens are
 write-only fields on the backend and are never echoed back.
@@ -93,6 +94,8 @@ src/
   30 s and stops on terminal states.
 - Retries: never on 4xx; network/5xx retried twice with backoff. Mutations never auto-retry.
 - Every mutation invalidates the smallest sensible key prefix and shows a toast.
+- Query options live in per-feature `*Query()` factories shared by hooks and the navigation
+  prefetcher — see `analysis/perf/QUERY_AUDIT.md` for the full key/staleness audit (phase 9).
 
 ---
 
@@ -387,18 +390,20 @@ checkout, funding and buy always end in 503 there.
 
 ## 9. Phase log
 
-| Phase | Status | Notes                                                                                                                                                                                                                                                                                    |
-| ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | ✅     | Analysis approved (`analysis/`).                                                                                                                                                                                                                                                         |
-| 2     | ✅     | Toolchain, tokens, API types, http/auth services, formatting/validation libs, component library, dev gallery, 43 unit tests.                                                                                                                                                             |
-| 3     | ✅     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation), SQLite harness, live tests.                                                                                                                                                                       |
-| 4     | ✅     | Dashboard, plans, vouchers (generate/print/detail), live sessions.                                                                                                                                                                                                                       |
-| 5     | ✅     | Routers (list/register/detail/operations), agents (directory/detail), devices. 109 unit + 21 live tests.                                                                                                                                                                                 |
-| 6     | ✅     | Payments + recovery board, audit log, settings (general/account, billing, team, subscription). 132 unit + 28 live tests.                                                                                                                                                                 |
-| 7     | ✅     | Agent portal (home, sell, wallet + Paystack return, vouchers, profile) and public storefront/checkout/result/pricing. 157 unit + 35 live tests.                                                                                                                                          |
-| 8     | ✅     | Platform console: overview, tenants (CRUD, activation, hard delete, members), router fleet, payments (3 sources), staff (invitations with one-time token, assignments/grants), platform audit. 173 unit + 42 live tests.                                                                 |
-| 8b    | ✅     | Credential delivery follow-up (with backend PR): storefront result page shows the single access code + connect steps while the voucher is unused and says where the email went; agent Sell/history and workspace voucher detail show `access_code`; gaps #2/#10 resolved, #40/#41 added. |
-| 9–11  | ⏳     | Performance, responsive & a11y hardening; production readiness.                                                                                                                                                                                                                          |
+| Phase | Status | Notes                                                                                                                                                                                                                                                                                                                                                                    |
+| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1     | ✅     | Analysis approved (`analysis/`).                                                                                                                                                                                                                                                                                                                                         |
+| 2     | ✅     | Toolchain, tokens, API types, http/auth services, formatting/validation libs, component library, dev gallery, 43 unit tests.                                                                                                                                                                                                                                             |
+| 3     | ✅     | Shell & auth (guards, layouts, login/register/reset/invite/select-tenant, navigation), SQLite harness, live tests.                                                                                                                                                                                                                                                       |
+| 4     | ✅     | Dashboard, plans, vouchers (generate/print/detail), live sessions.                                                                                                                                                                                                                                                                                                       |
+| 5     | ✅     | Routers (list/register/detail/operations), agents (directory/detail), devices. 109 unit + 21 live tests.                                                                                                                                                                                                                                                                 |
+| 6     | ✅     | Payments + recovery board, audit log, settings (general/account, billing, team, subscription). 132 unit + 28 live tests.                                                                                                                                                                                                                                                 |
+| 7     | ✅     | Agent portal (home, sell, wallet + Paystack return, vouchers, profile) and public storefront/checkout/result/pricing. 157 unit + 35 live tests.                                                                                                                                                                                                                          |
+| 8     | ✅     | Platform console: overview, tenants (CRUD, activation, hard delete, members), router fleet, payments (3 sources), staff (invitations with one-time token, assignments/grants), platform audit. 173 unit + 42 live tests.                                                                                                                                                 |
+| 8b    | ✅     | Credential delivery follow-up (with backend PR): storefront result page shows the single access code + connect steps while the voucher is unused and says where the email went; agent Sell/history and workspace voucher detail show `access_code`; gaps #2/#10 resolved, #40/#41 added.                                                                                 |
+| 9     | ✅     | Performance: bundle budgets enforced in CI (initial JS 133.5 kB gzip / 150 kB; largest lazy chunk 36.7 kB / 120 kB), latin-subset Inter Variable (218.5 kB → 48 kB, and the family-name fix that actually applies it), nav-hover/focus prefetch for chunks + top-route queries with a shared query-factory/defaults refactor. 180 unit tests. Reports: `analysis/perf/`. |
+| 10    | ✅     | Responsive & a11y hardening: WAI-ARIA keyboard patterns (Tabs, SegmentedControl), Menu Tab-close + focus restore, mobile drawer focus management, document titles on every route, computed contrast ratios; QA checklist: `analysis/QA_CHECKLIST.md`.                                                                                                                    |
+| 11    | ✅     | Production readiness: multi-stage Dockerfile + nginx same-origin API proxy template, error reporting funnel (`services/telemetry/errorReporter.ts` + optional `VITE_ERROR_REPORT_ENDPOINT`), CI bundle-budget gate, CHANGELOG, docs (§10–§12).                                                                                                                           |
 
 ### Toolchain notes
 
@@ -406,4 +411,60 @@ checkout, funding and buy always end in 503 there.
   `@vitejs/plugin-react` 5 (Vite 8 was released but the plugin/vitest matrix is not yet uniform).
 - `react-router` pinned to `^7` per the approved plan (v8 exists; not adopted).
 - Chunking: `react` (react, react-dom, react-router), `query`, `forms` (RHF + zod, loaded only by
-  routes with forms). Baseline shell: ~112 kB gzip JS incl. React + Router, 7.7 kB CSS.
+  routes with forms). Initial JS: **133.5 kB gzip** (react 92.5 + entry 30.6 + query 10.4), CSS
+  9.6 kB gzip, one 48 kB latin Inter Variable woff2 — enforced by `npm run size-check`
+  (see `analysis/perf/BUNDLE_REPORT.md`).
+
+---
+
+## 10. Performance strategy (phase 9)
+
+- **Budgets, enforced:** initial JS < 150 kB gzip and largest lazy chunk < 120 kB gzip are checked
+  by `scripts/check-bundle-size.mjs` in CI after every build. Current: 133.5 kB / 36.7 kB.
+- **Code splitting:** one chunk per route (`lazy()` + `lazyRoute` Suspense wrapper); vendor groups
+  `react` / `query` / `forms`; the forms group (RHF + zod, 36.7 kB) loads only on routes with
+  forms. The dev-only component gallery never ships.
+- **Fonts:** one latin-subset Inter Variable woff2 (48 kB, `font-display: swap`) declared directly
+  in `src/styles/index.css`; the ₦ sign intentionally falls back to the system stack. Do not
+  re-import `@fontsource-variable/inter` — it emits all seven unicode subsets (218.5 kB).
+- **Queries:** per-feature `*Query()` factories + `*_DEFAULT_PARAMS` constants are the single source
+  of truth shared by hooks and the nav prefetcher (`src/app/navigation/`), so a prefetched entry is
+  always a cache hit (same key, same `staleTime`) — never a duplicate request. Full audit:
+  `analysis/perf/QUERY_AUDIT.md`.
+- **Nav prefetch:** hover or keyboard-focus on any nav item loads its route chunk; top routes also
+  prefetch their first queries. The registry is lazy so it adds ~1.1 kB to the entry.
+- **UI:** image-free (inline SVG icons only), tabular numerals for money, no client-side
+  animation beyond reduced-motion-aware transitions.
+
+## 11. Responsive & accessibility strategy (phase 10)
+
+- **Breakpoints:** `sm` 640, `md` 768 (sidebar rail + bottom nav swap), `lg` 1024 (full sidebar),
+  `xl`/`2xl`, plus `xs` 416 for the tightest phones; QA widths 375 / 768 / 1280 / 1536. Tables use
+  `hideBelow` column breakpoints and stacked mobile cards.
+- **Keyboard:** skip links on every layout; native `<dialog>` for all modals (browser focus trap +
+  ESC); WAI-ARIA arrow-key patterns for Tabs / SegmentedControl; menus close on Tab and restore
+  focus to their trigger; the mobile nav drawer moves focus in on open and back to its trigger on
+  close.
+- **Screen readers:** one `h1` per page, labelled landmark regions, document titles on every route,
+  `aria-live` regions for toasts/spinners/polling results, text labels on every status badge and
+  icon-only button, `aria-describedby` tooltips and form error wiring.
+- **Motion & targets:** global `prefers-reduced-motion` override; touch targets ≥ 36 px everywhere,
+  ≥ 44 px for primary mobile navigation. Contrast ratios for all token pairs are computed in
+  `analysis/QA_CHECKLIST.md` (body text ≥ 4.5:1).
+
+## 12. Production deployment (phase 11)
+
+- **Build:** `npm ci && npm run build` → static `dist/` (no secrets; all `VITE_*` vars are baked at
+  build time and must be provided then).
+- **Docker (recommended, same-origin API):** `docker build -t yarotech-radius-frontend .` then run
+  with `-e API_UPSTREAM=http://<django-host>:8000 -p 8080:80`. The nginx template (`nginx.conf`)
+  serves hashed assets with immutable caching, falls back to `index.html` for SPA routes, gzips,
+  and proxies `/api/` and `/health` to the Django service — keep `VITE_API_BASE_URL=/api/v1` (the
+  default) so no CORS setup is needed.
+- **Separate origins:** host `dist/` anywhere static and set `VITE_API_BASE_URL` to the absolute API
+  URL at build time; add the UI origin to Django `CORS_ALLOWED_ORIGINS`.
+- **Runtime health & errors:** optional `VITE_ERROR_REPORT_ENDPOINT` receives JSON reports for
+  uncaught errors, unhandled rejections and React error-boundary failures (best effort, no
+  retries). Monitor the `/health` proxied endpoint for the backing API.
+- **CI:** every push/PR runs typecheck, lint, prettier, tests, build and the bundle-budget gate
+  (`.github/workflows/ci.yml`).

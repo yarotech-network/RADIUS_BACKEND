@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+stats.html
+.vite
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+harness.sqlite3

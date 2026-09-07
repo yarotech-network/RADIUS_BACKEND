@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { reportError } from '@/services/telemetry/errorReporter';
 
 interface Props {
   children: ReactNode;
@@ -20,7 +21,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
-    if (import.meta.env.DEV) console.error('Render error', error, info.componentStack);
+    reportError(error, {
+      source: 'error-boundary',
+      componentStack: info.componentStack,
+    });
   }
 
   override componentDidUpdate(prev: Props) {
