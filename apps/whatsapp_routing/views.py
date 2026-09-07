@@ -1,3 +1,6 @@
+from django.db import transaction
+from apps.tenants.models import Tenant
+from apps.subscriptions.entitlements import require_whatsapp
 from apps.core.api import tenant_for
 from rest_framework import viewsets
 from rest_framework import permissions
@@ -24,7 +27,16 @@ class WhatsAppRouteViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         return [IsTenantManager()]
 
     def perform_create(self, serializer):
-        serializer.save(
-            tenant=tenant_for(self.request),
-            webhook_token=secrets.token_urlsafe(32),
-        )
+        tenant = tenant_for(self.request)
+        with transaction.atomic():
+            Tenant.objects.select_for_update().get(pk=tenant.pk)
+            require_whatsapp(tenant)
+            serializer.save(tenant=tenant, webhook_token=secrets.token_urlsafe(32))
+
+    def perform_update(self, serializer):
+        tenant = tenant_for(self.request)
+        with transaction.atomic():
+            Tenant.objects.select_for_update().get(pk=tenant.pk)
+            if serializer.validated_data.get("is_active", serializer.instance.is_active):
+                require_whatsapp(tenant)
+            serializer.save()

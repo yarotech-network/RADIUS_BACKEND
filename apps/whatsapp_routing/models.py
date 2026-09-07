@@ -20,6 +20,8 @@ class TenantWhatsAppRoute(models.Model):
 
     def generate_route_token(self):
         """Generate HMAC-signed route token."""
+        from apps.subscriptions.entitlements import require_whatsapp
+        require_whatsapp(self.tenant)
         selector = secrets.token_hex(8)
         signature = hmac.new(
             self.webhook_token.encode(),
@@ -41,7 +43,8 @@ class TenantWhatsAppRoute(models.Model):
                     hashlib.sha256,
                 ).hexdigest()[:16]
                 if hmac.compare_digest(signature, expected):
-                    return route.tenant
+                    from apps.subscriptions.entitlements import whatsapp_allowed
+                    return route.tenant if whatsapp_allowed(route.tenant) else None
         except (ValueError, AttributeError):
             pass
         return None

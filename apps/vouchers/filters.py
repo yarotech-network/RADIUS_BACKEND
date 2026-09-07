@@ -6,13 +6,14 @@ from .models import Voucher, PaymentTransaction
 class VoucherFilter(django_filters.FilterSet):
     status = django_filters.CharFilter(field_name="status")
     plan = django_filters.NumberFilter(field_name="plan_id")
+    agent = django_filters.NumberFilter(field_name="agent_id")
     search = django_filters.CharFilter(method="filter_search")
     created_after = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_before = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
 
     class Meta:
         model = Voucher
-        fields = ["status", "plan", "search"]
+        fields = ["status", "plan", "agent", "search"]
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(

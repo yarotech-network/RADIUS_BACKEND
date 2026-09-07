@@ -9,7 +9,7 @@ def assigned_tenant(request, view=None):
     action = getattr(view, "action", request.method.lower())
     services = {
         "NASDeviceViewSet": {"list": "routers.view", "retrieve": "routers.view", "audit": "routers.view", "checks": "routers.view", "health": "routers.view", "test": "routers.test"},
-        "VoucherViewSet": {"list": "vouchers.print", "retrieve": "vouchers.print", "print": "vouchers.print", "pdf": "vouchers.print", "generate": "vouchers.generate"},
+        "VoucherViewSet": {"list": "vouchers.print", "retrieve": "vouchers.print", "print": "vouchers.print", "pdf": "vouchers.print", "authorize_print": "vouchers.print", "generate": "vouchers.generate"},
         "InternetPlanViewSet": {"list": "vouchers.generate", "retrieve": "vouchers.generate"},
         "PaymentTransactionViewSet": {"list": "payments.view", "retrieve": "payments.view"},
         "LiveUsersView": {"get": "live_sessions.view"},

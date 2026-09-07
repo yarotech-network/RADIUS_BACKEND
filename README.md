@@ -579,3 +579,12 @@ Before pushing a change:
 ```
 
 Keep migrations, tests, API schema changes, configuration examples, and deployment implications in the same review as the behavior they introduce.
+
+
+### Paystack browser return URLs
+
+Set `PAYSTACK_CALLBACK_ORIGIN` to the frontend origin, for example `https://app.example.com`. Production requires an explicit HTTPS origin. Local development defaults to `http://localhost:5173`; override it when using a different port or host. Do not include a path, query, fragment or credentials. Restart the API after changing this setting.
+
+Every new checkout sends its own `callback_url`: voucher purchases return to `/pay/result`, tenant business subscriptions to `/settings/subscription`, and agent funding to `/agent/wallet/return`. Paystack appends the transaction reference. These routes are on the frontend, not `/api/v1/payments/callback/` (the JSON status endpoint). Previously initialized checkouts retain their original provider settings.
+
+Keep the existing Paystack webhook configured: browser return URLs do not settle payments or replace verified webhook handling. Confirm frontend SPA fallback serves these paths and authenticated users can return to their workspace.

@@ -53,7 +53,13 @@ class NASDeviceViewSet(RouterOperationActions, AuditedCrudMixin, viewsets.ModelV
         return [IsTenantManager()]
 
     def perform_create(self, serializer):
-        serializer.save(tenant=tenant_for(self.request))
+        from apps.tenants.models import Tenant
+        from apps.subscriptions.entitlements import require_router_slot
+        tenant = tenant_for(self.request)
+        with transaction.atomic():
+            Tenant.objects.select_for_update().get(pk=tenant.pk)
+            require_router_slot(tenant)
+            serializer.save(tenant=tenant)
 
     def perform_update(self, serializer):
         if any(field in serializer.validated_data for field in ("nas_secret", "routeros_password_encrypted")):

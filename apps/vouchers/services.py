@@ -100,7 +100,7 @@ class PaystackService:
             "Content-Type": "application/json",
         }
 
-    def initialize_transaction(self, email, amount, reference=None, metadata=None):
+    def initialize_transaction(self, email, amount, reference=None, metadata=None, callback_url=None):
         """Initialize a Paystack transaction."""
         data = {
             "email": email,
@@ -109,6 +109,8 @@ class PaystackService:
         }
         if reference:
             data["reference"] = reference
+        if callback_url:
+            data["callback_url"] = callback_url
 
         response = requests.post(
             f"{self.BASE_URL}/transaction/initialize",

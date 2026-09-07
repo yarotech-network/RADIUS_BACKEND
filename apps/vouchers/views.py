@@ -1,3 +1,4 @@
+from apps.subscriptions.entitlements import authorize_print, require_print_authorization
 from apps.core.api import tenant_for
 from rest_framework import viewsets, generics, status, permissions
 from rest_framework.decorators import action
@@ -52,7 +53,7 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         return Voucher.objects.filter(tenant=tenant_for(self.request)).select_related("plan", "tenant", "agent__user").order_by("-created_at", "-id")
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve", "print", "pdf"]:
+        if self.action in ["list", "retrieve", "print", "pdf", "authorize_print"]:
             return [permissions.IsAuthenticated()]
         return [IsTenantManager()]
 
@@ -113,9 +114,17 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         audit(request, "voucher.disabled", voucher)
         return Response({"message": "Voucher disabled."})
 
+    @action(detail=False, methods=["post"], url_path="authorize-print")
+    def authorize_print(self, request):
+        from rest_framework import serializers
+        field = serializers.ListField(child=serializers.IntegerField(min_value=1), min_length=1, max_length=1000)
+        ids = field.run_validation(request.data.get("voucher_ids"))
+        return Response(authorize_print(tenant_for(request), ids))
+
     @action(detail=True, methods=["get"])
     def print(self, request, pk=None):
         voucher = self.get_object()
+        require_print_authorization(voucher)
         html_string = f"""
         <html>
         <body>
@@ -133,6 +142,7 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def pdf(self, request, pk=None):
         voucher = self.get_object()
+        require_print_authorization(voucher)
         html_string = f"""
         <html>
         <body>

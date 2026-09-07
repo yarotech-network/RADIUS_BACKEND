@@ -1,3 +1,4 @@
+from apps.payments.callbacks import payment_callback_url
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -83,6 +84,7 @@ class AgentWalletViewSet(viewsets.GenericViewSet):
                 email=request.user.email,
                 amount=payment.amount,
                 reference=reference,
+                callback_url=payment_callback_url("wallet"),
             )
             authorization_url = result["data"]["authorization_url"]
         except Exception:

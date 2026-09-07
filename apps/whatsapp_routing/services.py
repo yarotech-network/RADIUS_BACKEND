@@ -5,6 +5,9 @@ import hashlib
 
 def generate_route_url(tenant, base_url="https://wa.me"):
     """Generate wa.me link with route token."""
+    from apps.subscriptions.entitlements import whatsapp_allowed
+    if not whatsapp_allowed(tenant):
+        return None
     try:
         route = TenantWhatsAppRoute.objects.get(tenant=tenant, is_active=True)
         token = route.generate_route_token()

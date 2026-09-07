@@ -4,8 +4,18 @@ from .models import SubscriptionPlan, TenantSubscription, SubscriptionPayment
 
 @admin.register(SubscriptionPlan)
 class SubscriptionPlanAdmin(admin.ModelAdmin):
-    list_display = ["name", "price", "duration_days", "is_active"]
-    list_filter = ["is_active"]
+    list_display = ["name", "price", "duration_days", "max_routers", "whatsapp_enabled", "daily_voucher_print_limit", "is_active"]
+    list_filter = ["is_active", "whatsapp_enabled"]
+    # Changes go through the versioned platform API so purchased terms are protected.
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     search_fields = ["name"]
 
 

@@ -125,6 +125,7 @@ REST_FRAMEWORK = {
         "email_verify": "10/minute",
         "email_resend": "3/minute",
         "router_radius_test": "10/minute",
+        "subscription_verify": "10/minute",
     },
 }
 
@@ -217,3 +218,9 @@ PASSWORD_RESET_FRONTEND_URL = config(
     default="http://localhost:5173/reset-password?uid={uid}&token={token}",
 )
 PASSWORD_RESET_TIMEOUT = config("PASSWORD_RESET_TIMEOUT", default=3600, cast=int)
+
+# Browser return origin; never derive this from an untrusted request Host or payload.
+from apps.payments.callbacks import validate_callback_origin
+PAYSTACK_CALLBACK_ORIGIN = validate_callback_origin(config(
+    "PAYSTACK_CALLBACK_ORIGIN", default="http://localhost:5173",
+))

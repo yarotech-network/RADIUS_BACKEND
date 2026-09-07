@@ -1,3 +1,4 @@
+from apps.payments.callbacks import payment_callback_url
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,6 +44,7 @@ class InitializePaymentView(APIView):
                 email=email,
                 amount=plan.price,
                 reference=reference,
+                callback_url=payment_callback_url("voucher"),
                 metadata={
                     "transaction_id": transaction.id,
                     "plan_id": plan.id,

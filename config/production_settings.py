@@ -115,3 +115,8 @@ LOGGING = {
         },
     },
 }
+
+# Each checkout supplies a flow-specific return path under this trusted HTTPS origin.
+PAYSTACK_CALLBACK_ORIGIN = validate_callback_origin(
+    config("PAYSTACK_CALLBACK_ORIGIN", default=""), require_https=True,
+)
