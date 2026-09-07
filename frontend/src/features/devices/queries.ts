@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import type { DeviceListParams, MacDeviceWrite } from '@/types/api';
 import { devicesApi } from './api';
 
@@ -8,12 +9,23 @@ export const deviceKeys = {
   list: (params: DeviceListParams) => [...deviceKeys.lists(), params] as const,
 };
 
-export function useDevices(params: DeviceListParams) {
-  return useQuery({
+/** Initial `/devices` list params (matches DevicesPage defaults). */
+export const DEVICES_LIST_DEFAULT_PARAMS: DeviceListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+};
+
+/** Options shared by the hook and navigation prefetch (phase 9). */
+export function devicesListQuery(params: DeviceListParams) {
+  return {
     queryKey: deviceKeys.list(params),
     queryFn: () => devicesApi.list(params),
-    placeholderData: keepPreviousData,
-  });
+    staleTime: 30_000,
+  };
+}
+
+export function useDevices(params: DeviceListParams) {
+  return useQuery({ ...devicesListQuery(params), placeholderData: keepPreviousData });
 }
 
 function useInvalidateDevices() {

@@ -22,7 +22,7 @@ import { usePrincipal } from '@/app/auth/useAuth';
 import type { InternetPlan, PlanListParams } from '@/types/api';
 import { PlanDialog } from '../components/PlanDialog';
 import { PlanSummary } from '../components/PlanSummary';
-import { useDeletePlan, usePlans, useUpdatePlan } from '../queries';
+import { PLANS_DEFAULT_ORDERING, useDeletePlan, usePlans, useUpdatePlan } from '../queries';
 
 const FILTERS = ['is_active'] as const;
 
@@ -31,7 +31,7 @@ export default function PlansPage() {
   const canManage = can(principal, 'plans.manage');
   const canGenerate = can(principal, 'vouchers.generate');
   const toast = useToast();
-  const list = useListParams(FILTERS, { ordering: 'price' });
+  const list = useListParams(FILTERS, { ordering: PLANS_DEFAULT_ORDERING });
   const debouncedSearch = useDebouncedValue(list.state.search);
   const params = useMemo<PlanListParams>(() => {
     const p: PlanListParams = { page: list.state.page, page_size: list.state.page_size };

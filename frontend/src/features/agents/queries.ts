@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import type {
   AgentCreateRequest,
   AgentEditRequest,
@@ -14,12 +15,23 @@ export const agentKeys = {
   detail: (id: number) => [...agentKeys.all, 'detail', id] as const,
 };
 
-export function useAgents(params: AgentListParams) {
-  return useQuery({
+/** Initial `/agents` list params (matches AgentsPage defaults). */
+export const AGENTS_LIST_DEFAULT_PARAMS: AgentListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+};
+
+/** Options shared by the hook and navigation prefetch (phase 9). */
+export function agentsListQuery(params: AgentListParams) {
+  return {
     queryKey: agentKeys.list(params),
     queryFn: () => agentsApi.list(params),
-    placeholderData: keepPreviousData,
-  });
+    staleTime: 30_000,
+  };
+}
+
+export function useAgents(params: AgentListParams) {
+  return useQuery({ ...agentsListQuery(params), placeholderData: keepPreviousData });
 }
 
 export function useAgent(id: number) {

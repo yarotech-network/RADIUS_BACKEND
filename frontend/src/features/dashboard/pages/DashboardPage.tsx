@@ -18,15 +18,13 @@ import { formatRelative } from '@/lib/formatting/dates';
 import { can } from '@/services/auth/principal';
 import { usePrincipal } from '@/app/auth/useAuth';
 import { workspaceName } from '@/services/auth/principal';
-import { useDashboardStats, useLiveUsers } from '../queries';
-
-const LIVE_PARAMS = { page: 1, page_size: 1 } as const;
+import { DASHBOARD_LIVE_PARAMS, useDashboardStats, useLiveUsers } from '../queries';
 
 export default function DashboardPage() {
   const principal = usePrincipal();
   const stats = useDashboardStats();
   const canSessions = can(principal, 'sessions.view');
-  const live = useLiveUsers(LIVE_PARAMS, { live: canSessions });
+  const live = useLiveUsers(DASHBOARD_LIVE_PARAMS, { live: canSessions });
   const name = workspaceName(principal);
   const s = stats.data;
 

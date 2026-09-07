@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { AGENT_NAV } from '@/app/navigation/navConfig';
+import { prefetchRoute } from '@/app/navigation/prefetch';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { cn } from '@/lib/utilities/cn';
 import { BrandMark } from './BrandMark';
@@ -8,6 +10,7 @@ import { UserMenu } from './UserMenu';
 /** Mobile-first agent portal: top bar + bottom tabs; centred column on larger screens. */
 export function AgentLayout() {
   const location = useLocation();
+  const queryClient = useQueryClient();
   return (
     <div className="min-h-dvh bg-canvas">
       <a
@@ -27,6 +30,8 @@ export function AgentLayout() {
                 key={item.key}
                 to={item.to}
                 end={item.end ?? false}
+                onMouseEnter={() => prefetchRoute(item.to, queryClient)}
+                onFocus={() => prefetchRoute(item.to, queryClient)}
                 className={({ isActive }) =>
                   cn(
                     'rounded-control px-3 py-1.5 text-sm font-medium',
@@ -56,6 +61,8 @@ export function AgentLayout() {
               <NavLink
                 to={item.to}
                 end={item.end ?? false}
+                onMouseEnter={() => prefetchRoute(item.to, queryClient)}
+                onFocus={() => prefetchRoute(item.to, queryClient)}
                 className={({ isActive }) =>
                   cn(
                     'flex h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium',

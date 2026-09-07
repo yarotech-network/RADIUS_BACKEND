@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import { dashboardKeys } from '@/features/dashboard/queries';
 import type {
   NasDeviceCreate,
@@ -26,20 +27,39 @@ export const routerKeys = {
   operation: (id: string) => [...routerKeys.all, 'operation', id] as const,
 };
 
-export function useRouters(params: RouterListParams) {
-  return useQuery({
+/** Initial `/routers` list params (ordering matches RoutersPage). */
+export const ROUTERS_DEFAULT_ORDERING = 'name';
+export const ROUTERS_LIST_DEFAULT_PARAMS: RouterListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+  ordering: ROUTERS_DEFAULT_ORDERING,
+};
+
+/** Options shared by the hook and navigation prefetch (phase 9). */
+export function routersListQuery(params: RouterListParams) {
+  return {
     queryKey: routerKeys.list(params),
     queryFn: () => routersApi.list(params),
-    placeholderData: keepPreviousData,
-  });
+    staleTime: 30_000,
+  };
+}
+
+export function useRouters(params: RouterListParams) {
+  return useQuery({ ...routersListQuery(params), placeholderData: keepPreviousData });
+}
+
+export function routerOptionsQuery() {
+  return {
+    queryKey: routerKeys.options(),
+    queryFn: routersApi.listAll,
+    staleTime: 60_000,
+  };
 }
 
 /** Option list (id + name) for filters; cached for a minute. */
 export function useRouterOptions() {
   return useQuery({
-    queryKey: routerKeys.options(),
-    queryFn: routersApi.listAll,
-    staleTime: 60_000,
+    ...routerOptionsQuery(),
     select: (rows) => rows.map((r) => ({ id: r.id, name: r.name })),
   });
 }

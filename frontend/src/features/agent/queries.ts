@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PAGE_SIZE_DEFAULT } from '@/app/config/constants';
 import type {
   AgentGenerateRequest,
   AgentSelfEditRequest,
@@ -17,32 +18,61 @@ export const agentKeys = {
   history: (params: AllocationListParams) => [...agentKeys.all, 'history', params] as const,
 };
 
+/** Initial list params for the agent portal pages (match the pages' defaults). */
+export const AGENT_FUNDINGS_DEFAULT_PARAMS: FundingListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+};
+export const AGENT_HISTORY_DEFAULT_PARAMS: AllocationListParams = {
+  page: 1,
+  page_size: PAGE_SIZE_DEFAULT,
+};
+/** Five most recent allocations for the agent home ticker. */
+export const AGENT_RECENT_HISTORY_PARAMS: AllocationListParams = { page_size: 5 };
+
+/** Options shared by the hooks and navigation prefetch (phase 9). */
+export function agentMeQuery() {
+  return { queryKey: agentKeys.me(), queryFn: agentPortalApi.me, staleTime: 5 * 60_000 };
+}
+
+export function agentStatsQuery() {
+  return { queryKey: agentKeys.stats(), queryFn: agentPortalApi.stats, staleTime: 30_000 };
+}
+
+export function agentWalletQuery() {
+  return { queryKey: agentKeys.wallet(), queryFn: agentPortalApi.wallet, staleTime: 30_000 };
+}
+
+export function agentFundingsQuery(params: FundingListParams) {
+  return {
+    queryKey: agentKeys.fundings(params),
+    queryFn: () => agentPortalApi.fundings(params),
+    staleTime: 30_000,
+  };
+}
+
+export function agentHistoryQuery(params: AllocationListParams) {
+  return {
+    queryKey: agentKeys.history(params),
+    queryFn: () => agentPortalApi.history(params),
+    staleTime: 30_000,
+  };
+}
+
 export function useAgentMe() {
-  return useQuery({ queryKey: agentKeys.me(), queryFn: agentPortalApi.me, staleTime: 5 * 60_000 });
+  return useQuery(agentMeQuery());
 }
 
 export function useAgentStats() {
-  return useQuery({
-    queryKey: agentKeys.stats(),
-    queryFn: agentPortalApi.stats,
-    staleTime: 30_000,
-  });
+  return useQuery(agentStatsQuery());
 }
 
 export function useAgentWallet() {
-  return useQuery({
-    queryKey: agentKeys.wallet(),
-    queryFn: agentPortalApi.wallet,
-    staleTime: 30_000,
-  });
+  return useQuery(agentWalletQuery());
 }
 
 export function useFundings(params: FundingListParams) {
-  return useQuery({
-    queryKey: agentKeys.fundings(params),
-    queryFn: () => agentPortalApi.fundings(params),
-    placeholderData: keepPreviousData,
-  });
+  return useQuery({ ...agentFundingsQuery(params), placeholderData: keepPreviousData });
 }
 
 /** One funding payment looked up by reference; polls every 5 s while it is still pending. */
@@ -59,11 +89,7 @@ export function useFundingByReference(reference: string | null) {
 }
 
 export function useAllocationHistory(params: AllocationListParams) {
-  return useQuery({
-    queryKey: agentKeys.history(params),
-    queryFn: () => agentPortalApi.history(params),
-    placeholderData: keepPreviousData,
-  });
+  return useQuery({ ...agentHistoryQuery(params), placeholderData: keepPreviousData });
 }
 
 /** Invalidate everything that a wallet debit/credit changes. */
