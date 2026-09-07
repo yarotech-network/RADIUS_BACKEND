@@ -4,9 +4,12 @@ import type {
   AgentLoginResponse,
   LoginResponse,
   RegisterRequest,
+  RegisterResponse,
+  ResendVerificationResponse,
   StaffAssignment,
   User,
   Paginated,
+  VerifyEmailRequest,
 } from '@/types/api';
 import { tokenStore } from './tokenStore';
 import { derivePrincipal, type Principal } from './principal';
@@ -27,10 +30,24 @@ export const authApi = {
     );
   },
   register(payload: RegisterRequest) {
-    return http.post<LoginResponse>('/auth/register/', payload, {
+    return http.post<RegisterResponse>('/auth/register/', payload, {
       anonymous: true,
       tenantId: null,
     });
+  },
+  /** Confirms the emailed OTP. Returns tokens — the account is active on success. */
+  verifyEmail(payload: VerifyEmailRequest) {
+    return http.post<LoginResponse>('/auth/verify-email/', payload, {
+      anonymous: true,
+      tenantId: null,
+    });
+  },
+  resendVerification(email: string) {
+    return http.post<ResendVerificationResponse>(
+      '/auth/resend-verification/',
+      { email },
+      { anonymous: true, tenantId: null },
+    );
   },
   me() {
     return http.get<User>('/auth/user/', undefined, { tenantId: null });

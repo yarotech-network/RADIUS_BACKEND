@@ -2,9 +2,8 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router';
-import { useAuth } from '@/app/auth/useAuth';
-import { AuthCard } from '@/app/shell/AuthCard';
+import { Link, useNavigate } from 'react-router';
+import { AuthSplitLayout } from '@/app/shell/AuthSplitLayout';
 import { Alert } from '@/components/feedback/Alert';
 import { Button, FormField, Input } from '@/components/ui';
 import { authApi } from '@/features/auth/api';
@@ -44,7 +43,7 @@ const FIELDS = [
 ] as const;
 
 export default function RegisterPage() {
-  const { signIn } = useAuth();
+  const navigate = useNavigate();
   const submitError = useSubmitError();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -65,8 +64,10 @@ export default function RegisterPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     submitError.reset();
     try {
-      const tokens = await authApi.register(values);
-      await signIn(tokens); // RedirectIfAuthenticated sends the new owner to the workspace
+      // The account is created unverified — a 6-digit OTP goes to the given
+      // address and tokens are only issued once it is confirmed.
+      await authApi.register(values);
+      navigate('/verify-email', { state: { email: values.email } });
     } catch (error) {
       const leftover = applyApiErrors(error, form.setError, FIELDS);
       if (leftover) submitError.setMessage(leftover);
@@ -76,10 +77,9 @@ export default function RegisterPage() {
   const errors = form.formState.errors;
 
   return (
-    <AuthCard
+    <AuthSplitLayout
       title="Create your workspace"
       description="Sets up your business, the owner account, and a ready-to-use hotspot workspace."
-      wide
       footer={
         <>
           Already have an account?{' '}
@@ -138,6 +138,6 @@ export default function RegisterPage() {
           Create workspace
         </Button>
       </form>
-    </AuthCard>
+    </AuthSplitLayout>
   );
 }

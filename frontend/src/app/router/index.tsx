@@ -9,6 +9,7 @@ import {
   RequireSurface,
 } from '@/app/auth/guards';
 import { PublicLayout } from '@/app/shell/PublicLayout';
+import { RootGate } from './RootGate';
 import { WorkspaceLayout } from '@/app/shell/WorkspaceLayout';
 import { PlatformLayout } from '@/app/shell/PlatformLayout';
 import { AgentLayout } from '@/app/shell/AgentLayout';
@@ -20,6 +21,7 @@ import { PaymentRedirect } from '@/features/payments/pages/PaymentRedirect';
 const LoginPage = lazyRoute(lazy(() => import('@/features/auth/pages/LoginPage')));
 const AgentLoginPage = lazyRoute(lazy(() => import('@/features/auth/pages/AgentLoginPage')));
 const RegisterPage = lazyRoute(lazy(() => import('@/features/auth/pages/RegisterPage')));
+const VerifyEmailPage = lazyRoute(lazy(() => import('@/features/auth/pages/VerifyEmailPage')));
 const ForgotPasswordPage = lazyRoute(
   lazy(() => import('@/features/auth/pages/ForgotPasswordPage')),
 );
@@ -104,8 +106,7 @@ const devRoutes: RouteObject[] = import.meta.env.DEV
 
 /* ---------- workspace (tenant members + platform staff) ---------- */
 const workspaceRoutes: RouteObject[] = [
-  { index: true, Component: DashboardPage },
-  { path: 'dashboard', element: <Navigate to="/" replace /> },
+  { path: 'dashboard', Component: DashboardPage },
   {
     element: <RequireCapability capability="sessions.view" />,
     children: [{ path: 'sessions', Component: SessionsPage }],
@@ -224,12 +225,14 @@ export const router = createBrowserRouter([
       {
         Component: RedirectIfAuthenticated,
         children: [
+          /* Split-layout pages (login/register/verify) render their own full-page chrome. */
+          { path: '/login', Component: LoginPage },
+          { path: '/agent/login', Component: AgentLoginPage },
+          { path: '/register', Component: RegisterPage },
+          { path: '/verify-email', Component: VerifyEmailPage },
           {
             Component: PublicLayout,
             children: [
-              { path: '/login', Component: LoginPage },
-              { path: '/agent/login', Component: AgentLoginPage },
-              { path: '/register', Component: RegisterPage },
               { path: '/forgot-password', Component: ForgotPasswordPage },
               { path: '/reset-password', Component: ResetPasswordPage },
             ],
@@ -237,6 +240,15 @@ export const router = createBrowserRouter([
         ],
       },
       /* Public pages that work with or without a session */
+      /* Public landing page (wider layout) */
+      {
+        element: (
+          <RequireBooted>
+            <PublicLayout wide />
+          </RequireBooted>
+        ),
+        children: [{ path: '/', element: <RootGate /> }],
+      },
       {
         element: (
           <RequireBooted>

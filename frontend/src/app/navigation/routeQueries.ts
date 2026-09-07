@@ -44,7 +44,7 @@ import { VOUCHERS_LIST_DEFAULT_PARAMS, vouchersListQuery } from '@/features/vouc
  * a duplicate request.
  */
 export const queryPrefetchers: Record<string, (client: QueryClient) => void> = {
-  '/': (client) => {
+  '/dashboard': (client) => {
     void client.prefetchQuery(dashboardStatsQuery());
     void client.prefetchQuery(dashboardLiveQuery(DASHBOARD_LIVE_PARAMS));
   },

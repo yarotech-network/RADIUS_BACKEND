@@ -10,7 +10,7 @@ export function WorkspaceLayout() {
   return (
     <AppShell
       groups={WORKSPACE_NAV}
-      homePath="/"
+      homePath="/dashboard"
       profilePath="/settings/general"
       topBarStart={
         isStaff ? (

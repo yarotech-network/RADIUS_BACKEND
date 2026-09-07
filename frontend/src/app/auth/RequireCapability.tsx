@@ -12,6 +12,6 @@ type Props =
 export function RequireCapability(props: Props) {
   const principal = usePrincipal();
   const allowed = props.anyOf ? canAny(principal, props.anyOf) : can(principal, props.capability);
-  if (!allowed) return <Navigate to="/" replace />;
+  if (!allowed) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }

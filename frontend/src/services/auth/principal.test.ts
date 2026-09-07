@@ -70,7 +70,7 @@ describe('derivePrincipal + can()', () => {
     expect(can(onTen, 'routers.test')).toBe(false);
     expect(can(onTen, 'sessions.view')).toBe(true);
     expect(can(onTen, 'payments.view')).toBe(false);
-    expect(homePathFor(onTen)).toBe('/');
+    expect(homePathFor(onTen)).toBe('/dashboard');
 
     const onEleven = derivePrincipal(user('platform_staff', { tenant_id: null }), assignments, 11);
     expect(can(onEleven, 'payments.recovery.act')).toBe(true);

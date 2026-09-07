@@ -4,6 +4,23 @@ Notable changes to the Yarotech RADIUS frontend. Format follows
 [keepachangelog.com](https://keepachangelog.com/en/1.1.0/); versions follow
 [semver](https://semver.org/). Dates are UTC.
 
+## [0.2.0] — 2026-09-07
+
+### Added — email verification & public landing page (phase 12)
+
+- New tenants verify their email with a 6-digit OTP before the account unlocks:
+  registration returns no tokens, `/verify-email` collects the code (paste
+  support, auto-submit, resend with a 60 s cooldown) and signs the owner
+  straight into the workspace on success. Login answers `403
+email_not_verified` and forwards to the verification step.
+- Public landing page at `/` (hero, featured storefront plans for customers,
+  subscription plans for businesses, about section); the workspace overview
+  moved to `/dashboard`. The featured storefront is configured with
+  `VITE_FEATURED_STOREFRONT_SLUG`.
+- Two-sided authentication design (`AuthSplitLayout`): form on one side,
+  dashboard preview and feature highlights on the other — applied to sign-in,
+  agent sign-in, registration and email verification.
+
 ## [0.1.0] — 2026-09-07
 
 First release: complete operator workspace, agent portal, public storefront and
