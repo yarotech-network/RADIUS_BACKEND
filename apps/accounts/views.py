@@ -13,10 +13,18 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils import timezone
 from .serializers import (
     UserSerializer, LoginSerializer, RegisterSerializer,
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
-    ChangePasswordSerializer,
+    ChangePasswordSerializer, VerifyEmailSerializer, ResendVerificationSerializer,
+)
+from .verification import (
+    RESEND_COOLDOWN,
+    check_code,
+    issue_code,
+    mark_verified,
+    send_verification_email,
 )
 
 User = get_user_model()
@@ -39,6 +47,20 @@ class LoginView(APIView):
             password=serializer.validated_data["password"],
         )
         if user is not None:
+            if user.email_verified_at is None and not (
+                user.is_superuser or user.is_platform_admin
+            ):
+                return Response(
+                    {
+                        "error": "Verify your email address before signing in.",
+                        "code": "email_not_verified",
+                        # Only reachable with valid credentials, so the address is
+                        # not a disclosure — it lets the sign-in page hand the user
+                        # straight to the verification step.
+                        "email": user.email,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             refresh = RefreshToken.for_user(user)
             return Response({
                 "access": str(refresh.access_token),
@@ -59,12 +81,92 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        # The account exists but stays locked behind email confirmation: issue the
+        # OTP and withhold tokens until POST /auth/verify-email/ succeeds.
+        _, code = issue_code(user)
+        send_verification_email(user, code)
+        return Response(
+            {
+                "user": UserSerializer(user).data,
+                "detail": (
+                    "Workspace created. A verification code has been sent to your email — "
+                    "enter it to activate your account."
+                ),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyEmailView(APIView):
+    """Confirm an OTP and activate the account. Returns tokens (auto sign-in)."""
+
+    permission_classes = [permissions.AllowAny]
+    serializer_class = VerifyEmailSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_verify"
+
+    def post(self, request):
+        serializer = VerifyEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None or user.email_verified_at is not None:
+            # Same response for unknown addresses and already-verified accounts:
+            # never confirm which emails exist. Already-verified users are nudged
+            # to sign in by the generic message below.
+            return Response(
+                {"detail": "Invalid code or email.", "code": "invalid_code_or_email"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ok, error = check_code(user, code)
+        if not ok:
+            return Response(
+                {"detail": error, "code": "invalid_code"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        mark_verified(user)
         refresh = RefreshToken.for_user(user)
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
-        }, status=status.HTTP_201_CREATED)
+        })
+
+
+class ResendVerificationView(APIView):
+    """Email a fresh OTP to an unverified account (generic response, no enumeration)."""
+
+    permission_classes = [permissions.AllowAny]
+    serializer_class = ResendVerificationSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_resend"
+
+    def post(self, request):
+        serializer = ResendVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        user = User.objects.filter(email__iexact=email, email_verified_at__isnull=True).first()
+        sent = False
+        if user is not None:
+            latest = user.email_codes.order_by("-created_at").first()
+            # Local cooldown so a hammering client cannot mint unlimited codes.
+            if latest is not None and latest.created_at > timezone.now() - RESEND_COOLDOWN:
+                sent = None  # too soon — do not issue, but keep the response generic
+            else:
+                _, code = issue_code(user)
+                sent = send_verification_email(user, code)
+
+        message = (
+            "If an unverified account exists for that email, a new code is on its way. "
+            "Codes can be resent once per minute."
+        )
+        if sent is None:
+            message = "A code was sent recently — please wait a minute before requesting another."
+        return Response({"message": message})
 
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):

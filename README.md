@@ -268,8 +268,10 @@ This is a route summary. Request and response schemas are available from Swagger
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/register/` | Register a user and tenant context |
-| `POST` | `/api/v1/auth/login/` | Obtain access and refresh tokens |
+| `POST` | `/api/v1/auth/register/` | Register a user and tenant context (returns no tokens — an emailed OTP must be confirmed first) |
+| `POST` | `/api/v1/auth/verify-email/` | Confirm the 6-digit OTP and activate the account (returns tokens) |
+| `POST` | `/api/v1/auth/resend-verification/` | Email a fresh OTP to an unverified account (max 1/minute) |
+| `POST` | `/api/v1/auth/login/` | Obtain access and refresh tokens (403 `email_not_verified` until the OTP is confirmed) |
 | `POST` | `/api/v1/auth/token/refresh/` | Refresh an access token |
 | `GET/PATCH` | `/api/v1/auth/user/` | Read or update the current user |
 | `POST` | `/api/v1/auth/change-password/` | Change the authenticated user's password |

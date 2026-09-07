@@ -70,6 +70,10 @@ class RegisterSerializer(serializers.Serializer):
             password=validated_data["password"],
             phone=validated_data.get("phone", ""),
         )
+        # Internal flows are verified by default; public sign-up is the one path
+        # that must confirm the address via OTP before the account unlocks.
+        user.email_verified_at = None
+        user.save(update_fields=["email_verified_at"])
         tenant = Tenant.objects.create(
             name=validated_data["tenant_name"],
             slug=slugify(validated_data["tenant_name"]),
@@ -86,6 +90,16 @@ class RegisterSerializer(serializers.Serializer):
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=4, max_length=12, trim_whitespace=True)
+
+
+class ResendVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):

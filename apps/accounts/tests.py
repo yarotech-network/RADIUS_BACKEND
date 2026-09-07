@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
@@ -31,7 +32,7 @@ class RegistrationTests(APITestCase):
         payload.update(overrides)
         return payload
 
-    def test_registration_creates_hashed_user_tenant_owner_and_tokens(self):
+    def test_registration_creates_hashed_user_tenant_owner_and_otp(self):
         response = self.client.post(reverse("register"), self.valid_payload(), format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -41,8 +42,24 @@ class RegistrationTests(APITestCase):
         self.assertNotEqual(user.password, "StrongPass-4821")
         self.assertEqual(membership.role, "owner")
         self.assertEqual(membership.tenant.slug, "new-network")
-        self.assertIn("access", response.data)
-        self.assertIn("refresh", response.data)
+        # The account is created unverified: no tokens until the emailed OTP is confirmed.
+        self.assertIsNone(user.email_verified_at)
+        self.assertNotIn("access", response.data)
+        self.assertNotIn("refresh", response.data)
+        self.assertIn("detail", response.data)
+        # A 6-digit code was emailed to the registered address.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+        code = self._extract_code(mail.outbox[0].body)
+        self.assertEqual(len(code), 6)
+        self.assertTrue(code.isdigit())
+        self.assertNotEqual(code, user.email_codes.first().code_hash)
+
+    def _extract_code(self, body):
+        match = re.search(r"Your verification code is: (\d{6})", body)
+        if not match:
+            self.fail("OTP not found in email body")
+        return match.group(1)
 
     def test_registration_rejects_password_mismatch_without_partial_writes(self):
         response = self.client.post(

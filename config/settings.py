@@ -122,6 +122,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/minute",
         "password_reset": "5/hour",
+        "email_verify": "10/minute",
+        "email_resend": "3/minute",
         "router_radius_test": "10/minute",
     },
 }
