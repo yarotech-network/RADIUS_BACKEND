@@ -41,9 +41,9 @@ export function Menu({ trigger, items, align = 'end', className }: MenuProps) {
         setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' || event.key === 'Tab') {
         setOpen(false);
-        triggerRef.current?.focus();
+        if (event.key === 'Escape') triggerRef.current?.focus();
       }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         const buttons = Array.from(
@@ -101,6 +101,9 @@ export function Menu({ trigger, items, align = 'end', className }: MenuProps) {
                 disabled={item.disabled}
                 onClick={() => {
                   setOpen(false);
+                  // Return focus to the trigger before acting (phase 10) — the
+                  // menu item is about to unmount.
+                  triggerRef.current?.focus();
                   item.onSelect?.();
                 }}
                 className={cn(

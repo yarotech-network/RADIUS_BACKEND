@@ -1,9 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { STORAGE_KEYS } from '@/app/config/constants';
 import type { NavGroup } from '@/app/navigation/navConfig';
 import { mobilePrimaryItems, visibleGroups } from '@/app/navigation/navConfig';
+import { prefetchRoute } from '@/app/navigation/prefetch';
 import { useAuth } from '@/app/auth/useAuth';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { Button } from '@/components/ui/Button';
@@ -48,6 +50,7 @@ export function AppShell({
 }: AppShellProps) {
   const { principal } = useAuth();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerState, setDrawerState] = useState<{ open: boolean; path: string }>({
     open: false,
@@ -56,8 +59,22 @@ export function AppShell({
   // The drawer closes automatically on navigation (derived, no effect needed).
   const drawerOpen = drawerState.open && drawerState.path === location.pathname;
   const setDrawerOpen = (open: boolean) => setDrawerState({ open, path: location.pathname });
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const visible = visibleGroups(groups, principal);
   const primary = mobilePrimaryItems(groups, principal);
+
+  // Focus management (phase 10): focus lands inside the drawer when it opens
+  // and returns to its trigger when the user closes it. Navigation closes the
+  // drawer without stealing focus from the newly opened page.
+  useEffect(() => {
+    if (drawerOpen) drawerCloseRef.current?.focus();
+  }, [drawerOpen]);
+
+  function closeDrawer(restoreFocus: boolean) {
+    setDrawerOpen(false);
+    if (restoreFocus) moreButtonRef.current?.focus();
+  }
 
   useEffect(() => {
     try {
@@ -70,7 +87,10 @@ export function AppShell({
   useEffect(() => {
     if (!drawerOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerState((s) => ({ ...s, open: false }));
+      if (e.key === 'Escape') {
+        setDrawerState((s) => ({ ...s, open: false }));
+        moreButtonRef.current?.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
@@ -181,6 +201,8 @@ export function AppShell({
               <NavLink
                 to={item.to}
                 end={item.end ?? false}
+                onMouseEnter={() => prefetchRoute(item.to, queryClient)}
+                onFocus={() => prefetchRoute(item.to, queryClient)}
                 className={({ isActive }) =>
                   cn(
                     'flex h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium',
@@ -207,6 +229,7 @@ export function AppShell({
           <li>
             <button
               type="button"
+              ref={moreButtonRef}
               onClick={() => setDrawerOpen(true)}
               aria-expanded={drawerOpen}
               aria-controls="mobile-drawer"
@@ -234,16 +257,17 @@ export function AppShell({
             type="button"
             aria-label="Close navigation"
             className="absolute inset-0 bg-brand-950/50"
-            onClick={() => setDrawerOpen(false)}
+            onClick={() => closeDrawer(true)}
           />
           <div className="absolute inset-y-0 left-0 flex w-[82vw] max-w-xs flex-col bg-brand-950 text-white">
             <div className="flex h-14 items-center justify-between px-4">
               <BrandMark inverse />
               <Button
+                ref={drawerCloseRef}
                 variant="ghost"
                 size="icon"
                 aria-label="Close"
-                onClick={() => setDrawerOpen(false)}
+                onClick={() => closeDrawer(true)}
                 className="text-white hover:bg-white/10"
               >
                 <X className="size-5" />
