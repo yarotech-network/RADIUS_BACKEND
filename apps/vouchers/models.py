@@ -48,6 +48,7 @@ class InternetPlan(models.Model):
 
 
 class Voucher(models.Model):
+    purchased_terms = models.JSONField(null=True, blank=True, editable=False)
     rate_limit_snapshot = models.CharField(max_length=20, blank=True, default="", db_default="")
     STATUS_CHOICES = [
         ("unused", "Unused"),
@@ -106,15 +107,25 @@ class Voucher(models.Model):
         activated_at = timezone.now()
         self.status = "active"
         self.activated_at = activated_at
-        self.expires_at = activated_at + timezone.timedelta(hours=self.plan.duration_hours)
+        self.expires_at = activated_at + timezone.timedelta(hours=self.service_terms['duration_hours'])
         self.save(update_fields=["status", "activated_at", "expires_at"])
 
     def expire(self):
         self.status = "expired"
         self.save(update_fields=["status"])
 
+    @property
+    def service_terms(self):
+        if self.purchased_terms is not None:
+            return self.purchased_terms
+        return {field: getattr(self.plan, field) for field in ('name', 'price', 'duration_hours', 'data_limit', 'rate_limit')}
+
+    def get_price_display(self):
+        return f"\u20a6{self.service_terms['price'] / 100:,.0f}"
+
 
 class PaymentTransaction(models.Model):
+    purchased_terms = models.JSONField(null=True, blank=True, editable=False)
     verified_at = models.DateTimeField(null=True, blank=True)
     STATUS_CHOICES = [
         ("pending", "Pending"),
@@ -131,7 +142,7 @@ class PaymentTransaction(models.Model):
     customer_phone = models.CharField(max_length=20, blank=True)
     voucher = models.OneToOneField(Voucher, on_delete=models.SET_NULL, null=True, blank=True, related_name="payment")
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="payments")
-    plan = models.ForeignKey(InternetPlan, on_delete=models.SET_NULL, null=True, blank=True)
+    plan = models.ForeignKey(InternetPlan, on_delete=models.PROTECT, null=True, blank=True)
     paystack_reference = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)

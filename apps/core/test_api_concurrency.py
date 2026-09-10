@@ -50,11 +50,14 @@ class ConcurrentApiTests(TransactionTestCase):
             return [future.result(timeout=20) for future in futures]
 
     def test_concurrent_verification_creates_one_voucher_and_radius_identity(self):
-        payment = PaymentTransaction.objects.create(tenant=self.tenant, plan=self.plan, reference="same-payment", amount=5000, customer_email="buyer@example.com")
+        from apps.vouchers.terms import snapshot_plan
+        payment = PaymentTransaction.objects.create(tenant=self.tenant, plan=self.plan, reference="same-payment", amount=5000, customer_email="buyer@example.com", purchased_terms=snapshot_plan(self.plan))
+        InternetPlan.objects.filter(pk=self.plan.pk).update(is_active=False, duration_hours=1)
         verified = {"reference": payment.reference, "status": "success", "currency": "NGN", "amount": 5000}
         results = self.parallel(lambda: fulfill_verified_voucher(PaymentTransaction.objects.get(pk=payment.pk), verified).voucher_id)
         self.assertEqual(results[0], results[1])
         self.assertEqual(Voucher.objects.count(), 1)
+        self.assertEqual(Voucher.objects.get().service_terms['duration_hours'], 24)
         self.assertEqual(Radcheck.objects.filter(attribute="Cleartext-Password").count(), 1)
 
     def test_concurrent_wallet_spending_cannot_overdraw(self):

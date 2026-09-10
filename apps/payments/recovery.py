@@ -33,7 +33,9 @@ def fulfill_verified_voucher(payment, verified):
         if not locked.voucher_id:
             if locked.plan_id is None:
                 raise ValueError("Payment plan is unavailable.")
-            locked.voucher = VoucherService.generate_vouchers(tenant=locked.tenant, plan_id=locked.plan_id, quantity=1, source="customer")[0]
+            if locked.purchased_terms is not None and locked.purchased_terms.get('price') != locked.amount:
+                raise ValueError('Purchased amount mismatch.')
+            locked.voucher = VoucherService.generate_vouchers(tenant=locked.tenant, plan_id=locked.plan_id, quantity=1, source="customer", purchased_terms=locked.purchased_terms)[0]
         locked.status = "success"
         locked.paid_at = locked.paid_at or timezone.now()
         locked.save(update_fields=["voucher", "status", "paid_at"])

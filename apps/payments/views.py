@@ -7,6 +7,10 @@ from .serializers import InitializePaymentSerializer
 from apps.vouchers.models import PaymentTransaction
 from apps.vouchers.serializers import PaymentTransactionSerializer
 import secrets
+from django.db import transaction as db_transaction
+from rest_framework.exceptions import ValidationError
+from apps.vouchers.models import InternetPlan
+from apps.vouchers.terms import snapshot_plan
 from apps.core.commands import idempotent
 
 
@@ -26,16 +30,16 @@ class InitializePaymentView(APIView):
         phone = serializer.validated_data.get("phone", "")
         reference = f"yarotech-{secrets.token_hex(12)}"
 
-        # Create pending transaction
-        transaction = PaymentTransaction.objects.create(
-            reference=reference,
-            amount=plan.price,
-            customer_email=email,
-            customer_name=name,
-            customer_phone=phone,
-            plan=plan,
-            tenant=plan.tenant,
-        )
+        # Freeze terms with the order; provider I/O starts only after commit.
+        with db_transaction.atomic():
+            plan = InternetPlan.objects.select_for_update(of=('self',)).select_related('bandwidth_profile').get(pk=plan.pk)
+            if not plan.is_active or not plan.tenant.is_active:
+                raise ValidationError({'plan_id': 'This plan is no longer available.'})
+            transaction = PaymentTransaction.objects.create(
+                reference=reference, amount=plan.price, customer_email=email,
+                customer_name=name, customer_phone=phone, plan=plan, tenant=plan.tenant,
+                purchased_terms=snapshot_plan(plan),
+            )
 
         # Initialize Paystack
         service = get_paystack_service(plan.tenant)
@@ -112,7 +116,7 @@ class PaymentCallbackView(APIView):
             "voucher": voucher.username if reveal else None,
             "access_code": voucher.username if reveal else None,
             "code_revealed": reveal,
-            "plan": {"name": voucher.plan.name, "duration_hours": voucher.plan.duration_hours, "data_limit": voucher.plan.data_limit} if voucher else None,
+            "plan": {field: voucher.service_terms[field] for field in ("name", "duration_hours", "data_limit")} if voucher else None,
             "tenant_name": transaction.tenant.name,
             "customer_email_masked": mask_email(transaction.customer_email),
         })

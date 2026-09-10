@@ -55,9 +55,9 @@ class InternetPlanSerializer(serializers.ModelSerializer):
 
 class VoucherSerializer(serializers.ModelSerializer):
     device_limit = serializers.IntegerField(min_value=1, max_value=2147483647, required=False)
-    plan_name = serializers.CharField(source="plan.name", read_only=True)
-    plan_duration = serializers.CharField(source="plan.duration_hours", read_only=True)
-    price_display = serializers.CharField(source="plan.get_price_display", read_only=True)
+    plan_name = serializers.CharField(source="service_terms.name", read_only=True)
+    plan_duration = serializers.CharField(source="service_terms.duration_hours", read_only=True)
+    price_display = serializers.CharField(source="get_price_display", read_only=True)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     agent_name = serializers.CharField(source="agent.user.username", read_only=True, default=None)
     # Username when it doubles as the password (single-code vouchers); None for legacy or manual

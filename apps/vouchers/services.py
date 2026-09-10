@@ -14,27 +14,37 @@ class VoucherService:
     @transaction.atomic
     def write_radius_credentials(voucher):
         Radcheck.objects.create(username=voucher.username, attribute="Cleartext-Password", op=":=", value=voucher.password)
-        Radcheck.objects.create(username=voucher.username, attribute="Max-Days", op=":=", value=str(voucher.plan.duration_hours * 3600))
+        terms = voucher.service_terms
+        Radcheck.objects.create(username=voucher.username, attribute="Max-Days", op=":=", value=str(terms['duration_hours'] * 3600))
         # Explicit opt-in: preserve existing legacy vouchers and custom-rate issuance.
-        profile = voucher.plan.bandwidth_profile
-        snapshot = voucher.plan.rate_limit if profile and profile.rate_limit == voucher.plan.rate_limit else ""
+        if voucher.purchased_terms is not None:
+            snapshot = terms['radius_rate_limit']
+        else:
+            profile = voucher.plan.bandwidth_profile
+            snapshot = voucher.plan.rate_limit if profile and profile.rate_limit == voucher.plan.rate_limit else ""
         if snapshot:
             Radreply.objects.filter(username=voucher.username, attribute="Mikrotik-Rate-Limit").delete()
             Radreply.objects.create(username=voucher.username, attribute="Mikrotik-Rate-Limit", op=":=", value=snapshot)
         voucher.rate_limit_snapshot = snapshot
         voucher.save(update_fields=["rate_limit_snapshot"])
-        if voucher.plan.data_limit > 0:
-            Radcheck.objects.create(username=voucher.username, attribute="Max-Total-Octets", op=":=", value=str(voucher.plan.data_limit * 1024 * 1024))
+        if terms['data_limit'] > 0:
+            Radcheck.objects.create(username=voucher.username, attribute="Max-Total-Octets", op=":=", value=str(terms['data_limit'] * 1024 * 1024))
 
     @staticmethod
     @transaction.atomic
-    def generate_vouchers(tenant, plan_id, quantity, prefix="", agent=None, source="admin"):
+    def generate_vouchers(tenant, plan_id, quantity, prefix="", agent=None, source="admin", purchased_terms=None):
         """Generate vouchers and create RADIUS radcheck rows."""
         if type(quantity) is not int or not 1 <= quantity <= 100:
             raise ValueError("Quantity must be an integer between 1 and 100.")
         if not tenant.is_active or (agent is not None and agent.tenant_id != tenant.pk):
             raise ValueError("Invalid tenant or agent scope.")
-        plan = InternetPlan.objects.get(id=plan_id, tenant=tenant, is_active=True)
+        query = InternetPlan.objects.filter(id=plan_id, tenant=tenant)
+        if purchased_terms is None:
+            query = query.filter(is_active=True)
+        elif (source != 'customer' or quantity != 1 or purchased_terms.get('plan_id') != plan_id
+              or purchased_terms.get('tenant_id') != tenant.pk):
+            raise ValueError('Invalid purchased plan scope.')
+        plan = query.get()
         vouchers = []
 
         for _ in range(quantity):
@@ -52,6 +62,7 @@ class VoucherService:
                 agent=agent,
                 generation_source=source,
                 device_limit=1,
+                purchased_terms=purchased_terms,
             )
 
             VoucherService.write_radius_credentials(voucher)

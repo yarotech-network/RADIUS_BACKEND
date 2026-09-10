@@ -33,11 +33,12 @@ def build_credential_email(payment):
     `Voucher.generate_credentials`), so the customer only ever handles a single value.
     """
     voucher = payment.voucher
-    plan = voucher.plan
+    plan = voucher.service_terms
     tenant = payment.tenant
     code = voucher.username
+    paid_display = f"\u20a6{payment.amount / 100:,.0f}"
     subject = f"Your {tenant.name} Wi-Fi access code"
-    plan_line = f"{plan.name} — {format_duration(plan.duration_hours)}, {format_data_limit(plan.data_limit)}"
+    plan_line = f"{plan['name']} — {format_duration(plan['duration_hours'])}, {format_data_limit(plan['data_limit'])}"
     support = tenant.phone or tenant.email
     support_line = f"Need help? Contact {tenant.name} on {support}." if support else f"Need help? Contact {tenant.name}."
 
@@ -47,7 +48,7 @@ def build_credential_email(payment):
         f"Your access code: {code}\n"
         f"\n"
         f"Plan: {plan_line}\n"
-        f"Amount paid: {plan.get_price_display()}\n"
+        f"Amount paid: {paid_display}\n"
         f"Payment reference: {payment.reference}\n"
         f"\n"
         f"How to connect:\n"
@@ -64,7 +65,7 @@ def build_credential_email(payment):
         f"<p style=\"margin:0 0 20px;font-family:Consolas,Menlo,monospace;font-size:28px;letter-spacing:4px;font-weight:bold\">{escape(code)}</p>"
         "<table style=\"border-collapse:collapse;font-size:14px\">"
         f"<tr><td style=\"padding:4px 12px 4px 0;color:#475569\">Plan</td><td style=\"padding:4px 0\">{escape(plan_line)}</td></tr>"
-        f"<tr><td style=\"padding:4px 12px 4px 0;color:#475569\">Amount paid</td><td style=\"padding:4px 0\">{escape(plan.get_price_display())}</td></tr>"
+        f"<tr><td style=\"padding:4px 12px 4px 0;color:#475569\">Amount paid</td><td style=\"padding:4px 0\">{escape(paid_display)}</td></tr>"
         f"<tr><td style=\"padding:4px 12px 4px 0;color:#475569\">Reference</td><td style=\"padding:4px 0;font-family:Consolas,Menlo,monospace\">{escape(payment.reference)}</td></tr>"
         "</table>"
         "<h3 style=\"margin:20px 0 8px;font-size:15px\">How to connect</h3>"

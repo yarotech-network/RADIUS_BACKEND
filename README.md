@@ -643,3 +643,34 @@ trial assignment is restored. Do not reverse the schema while new code is runnin
 Validation uses isolated local PostgreSQL test databases and mocked frontend APIs.
 Production migration, provider calls, and live router enforcement are separate
 operational checks; this change does not apply production configuration.
+
+
+## Purchased internet-plan terms
+
+New customer checkout orders snapshot the server-owned plan name, price, duration,
+data allowance, advertised speed, and existing RADIUS speed-reply mode. Checkout
+locks the plan while capturing the order and rechecks availability; provider I/O
+runs after commit. The snapshot is not a writable API field.
+
+Verified fulfillment copies these terms to the voucher and allows that original
+plan to be inactive. Result pages, voucher details, print/PDF, email, activation
+expiry, and RADIUS writes use the saved terms. Payment matching, tenant checks,
+transaction locks, paid-unfulfilled recovery, and duplicate suppression remain.
+New purchases and ordinary generation still require an active plan. Plans with
+payment history cannot be deleted through the ORM/API; deactivate them instead.
+Tenant inactivity is still enforced; this is not an override of tenant suspension.
+
+Legacy orders and vouchers retain null snapshots and their existing behavior;
+original historical terms cannot be reconstructed safely from the current plan.
+Deactivated legacy orders may still require operator investigation. Payment-account
+rotation and physical RADIUS enforcement are separate concerns. Custom-rate plans
+retain their prior enforcement mode; this change does not retrofit speed replies.
+
+Deploy vouchers.0004_paymenttransaction_purchased_terms_and_more before the new
+backend and workers. Its SQL adds two nullable JSONB columns without a data backfill;
+the deletion-policy change is enforced by Django. Review lock acquisition and use
+a short lock timeout on busy production tables. Upgrade checkout and fulfillment
+writers together; old code does not honor snapshots. Retain the additive columns
+and saved terms on rollback, and pause new checkout/fulfillment if reverting to an
+older writer until snapshot-aware code is restored. No frontend contract change is
+required: existing displayed plan fields now contain the purchased values.

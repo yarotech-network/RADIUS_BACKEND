@@ -38,6 +38,12 @@ class InternetPlanViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(tenant=tenant_for(self.request))
 
+    def perform_destroy(self, instance):
+        try:
+            instance.delete()
+        except ProtectedError:
+            raise ValidationError('This plan has vouchers or payment history. Deactivate it instead.')
+
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             return [permissions.IsAuthenticated()]
@@ -139,8 +145,8 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         <h1>YAROTECH Voucher</h1>
         <p><strong>Username:</strong> {escape(voucher.username)}</p>
         <p><strong>Password:</strong> {escape(voucher.password)}</p>
-        <p><strong>Plan:</strong> {escape(voucher.plan.name)}</p>
-        <p><strong>Duration:</strong> {voucher.plan.duration_hours} hours</p>
+        <p><strong>Plan:</strong> {escape(voucher.service_terms['name'])}</p>
+        <p><strong>Duration:</strong> {voucher.service_terms['duration_hours']} hours</p>
         <p><strong>Status:</strong> {voucher.status}</p>
         </body>
         </html>
@@ -157,8 +163,8 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         <h1>YAROTECH Voucher</h1>
         <p><strong>Username:</strong> {escape(voucher.username)}</p>
         <p><strong>Password:</strong> {escape(voucher.password)}</p>
-        <p><strong>Plan:</strong> {escape(voucher.plan.name)}</p>
-        <p><strong>Duration:</strong> {voucher.plan.duration_hours} hours</p>
+        <p><strong>Plan:</strong> {escape(voucher.service_terms['name'])}</p>
+        <p><strong>Duration:</strong> {voucher.service_terms['duration_hours']} hours</p>
         <p><strong>Status:</strong> {voucher.status}</p>
         </body>
         </html>
