@@ -18,6 +18,7 @@ from apps.core.permissions import IsTenantManager
 from .radius_client import RadiusAuthClient, RadiusError
 from .secret_store import secret_store
 from .operation_api import RouterOperationActions
+from .hotspot_api import HotspotSetupActions
 from django.db import transaction
 from rest_framework.exceptions import APIException
 from apps.core.commands import idempotent
@@ -31,7 +32,7 @@ class RouterBusy(APIException):
     default_detail = "A provisioning operation is pending; wait for its result before editing the router."
 
 
-class NASDeviceViewSet(RouterOperationActions, AuditedCrudMixin, viewsets.ModelViewSet):
+class NASDeviceViewSet(HotspotSetupActions, RouterOperationActions, AuditedCrudMixin, viewsets.ModelViewSet):
     filterset_fields = ["is_active", "onboarding_state", "deployment_status"]
     search_fields = ["name", "ip_address", "location"]
     serializer_class = NASDeviceSerializer

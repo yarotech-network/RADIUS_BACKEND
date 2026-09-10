@@ -39,3 +39,40 @@ def fulfill_verified_voucher(payment, verified):
         locked.save(update_fields=["voucher", "status", "paid_at"])
         queue_credential_delivery(locked)
         return locked
+
+
+class VoucherVerificationUnavailable(Exception):
+    pass
+
+
+class VoucherVerificationMismatch(Exception):
+    pass
+
+
+def verify_voucher_payment(payment):
+    """Verify with the saved tenant account, then issue at most one voucher."""
+    from .services import get_paystack_service
+    payment.refresh_from_db()
+    if payment.status == "success" and payment.voucher_id:
+        return payment
+    try:
+        result = get_paystack_service(payment.tenant).verify_transaction(payment.reference)
+    except Exception as exc:
+        raise VoucherVerificationUnavailable() from exc
+    if not isinstance(result, dict) or result.get("status") is not True or not isinstance(result.get("data"), dict):
+        raise VoucherVerificationUnavailable()
+    data = result["data"]
+    if (data.get("reference") != payment.reference or type(data.get("amount")) is not int
+            or data["amount"] != payment.amount or data.get("currency") != "NGN"):
+        raise VoucherVerificationMismatch()
+    if data.get("status") == "success":
+        try:
+            return fulfill_verified_voucher(payment, data)
+        except Exception:
+            # Fulfillment rolls back, but verified_at persists for recovery.
+            # Return paid evidence without falsely claiming a code was issued.
+            payment.refresh_from_db()
+            if payment.verified_at is None:
+                raise
+    payment.refresh_from_db()
+    return payment

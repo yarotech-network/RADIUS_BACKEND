@@ -19,3 +19,5 @@ DATABASES["default"]["TEST"] = {  # noqa: F405
 }
 DATABASES["default"]["HOST"] = os.environ.get("DB_TEST_HOST", "localhost")  # noqa: F405
 DATABASES["default"]["PORT"] = os.environ.get("DB_TEST_PORT", "5432")  # noqa: F405
+
+REGISTRATION_EMAIL_BACKEND = ""

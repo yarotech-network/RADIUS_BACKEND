@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.tenants",
     "apps.vouchers",
+    "apps.customers",
     "apps.routers",
     "apps.agents",
     "apps.payments",
@@ -125,7 +126,10 @@ REST_FRAMEWORK = {
         "email_verify": "10/minute",
         "email_resend": "3/minute",
         "router_radius_test": "10/minute",
+        "router_hotspot_setup": "30/minute",
+        "router_discovery": "3/minute",
         "subscription_verify": "10/minute",
+        "storefront_verify": "10/minute",
     },
 }
 
@@ -154,6 +158,7 @@ CORS_EXPOSE_HEADERS = ["Idempotency-Replayed", "Retry-After"]
 SPECTACULAR_SETTINGS = {
     "POSTPROCESSING_HOOKS": ["drf_spectacular.hooks.postprocess_schema_enums", "apps.core.schema.annotate_api_errors_and_commands"],
     "ENUM_NAME_OVERRIDES": {
+        "HotspotServiceEnum": [("hotspot", "hotspot")],
         "OnboardingStateEnum": "apps.routers.models.NASDevice.ONBOARDING_STATES",
         "AgentStatusEnum": "apps.agents.models.AgentProfile.STATUS_CHOICES",
         "VoucherStatusEnum": "apps.vouchers.models.Voucher.STATUS_CHOICES",
@@ -224,3 +229,15 @@ from apps.payments.callbacks import validate_callback_origin
 PAYSTACK_CALLBACK_ORIGIN = validate_callback_origin(config(
     "PAYSTACK_CALLBACK_ORIGIN", default="http://localhost:5173",
 ))
+
+# Optional registration-only delivery override (e.g. console for local OTP testing).
+REGISTRATION_EMAIL_BACKEND = config("REGISTRATION_EMAIL_BACKEND", default="")
+
+
+# Read-only RouterOS discovery. Approve management peers explicitly; never public URLs.
+ROUTER_DISCOVERY_ALLOWED_CIDRS = config("ROUTER_DISCOVERY_ALLOWED_CIDRS", default="", cast=Csv())
+ROUTER_DISCOVERY_HTTPS_PORT = config("ROUTER_DISCOVERY_HTTPS_PORT", default=443, cast=int)
+ROUTER_DISCOVERY_CA_BUNDLE = config("ROUTER_DISCOVERY_CA_BUNDLE", default="")
+
+# Private FreeRADIUS PAP integration; unset disables the decision endpoint.
+PPPOE_RADIUS_TOKEN = config("PPPOE_RADIUS_TOKEN", default="")

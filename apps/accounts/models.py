@@ -1,3 +1,4 @@
+import uuid
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -62,3 +63,20 @@ class EmailVerificationCode(models.Model):
 
     def __str__(self):
         return f"email verification for {self.user.username} ({'consumed' if self.consumed_at else 'outstanding'})"
+
+
+class RegistrationEmailChallenge(models.Model):
+    """Temporary email ownership proof, before any user or workspace exists."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
+    code_hash = models.CharField(max_length=64, blank=True)
+    token_hash = models.CharField(max_length=64, blank=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'accounts_registration_email_challenge'
+        indexes = [models.Index(fields=['expires_at'], name='registration_expiry_idx')]

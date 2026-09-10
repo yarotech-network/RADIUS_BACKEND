@@ -4,6 +4,7 @@ from . import views
 
 router = DefaultRouter()
 router.include_format_suffixes = False
+router.register("bandwidth-profiles", views.BandwidthProfileViewSet, basename="bandwidth-profile")
 router.register("plans", views.InternetPlanViewSet, basename="plan")
 router.register("vouchers", views.VoucherViewSet, basename="voucher")
 router.register("payments/transactions", views.PaymentTransactionViewSet, basename="payment-transaction")

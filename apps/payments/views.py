@@ -96,10 +96,15 @@ class PaymentCallbackView(APIView):
             transaction = PaymentTransaction.objects.select_related("voucher__plan", "tenant").get(reference=reference)
         except PaymentTransaction.DoesNotExist:
             return Response({"error": "Payment not found"}, status=404)
+        return self.payment_response(transaction)
+
+    def payment_response(self, transaction):
+        reference = transaction.reference
         voucher = transaction.voucher
         reveal = voucher is not None and voucher.status == "unused" and voucher.password == voucher.username
         response = Response({
             "status": transaction.status,
+            "payment_verified": transaction.verified_at is not None,
             "reference": reference,
             "voucher": voucher.username if voucher else None,
             "access_code": voucher.username if reveal else None,
@@ -110,3 +115,33 @@ class PaymentCallbackView(APIView):
         })
         response["Cache-Control"] = "no-store"
         return response
+
+
+class VerifyPaymentView(PaymentCallbackView):
+    from rest_framework.throttling import ScopedRateThrottle
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "storefront_verify"
+    authentication_classes = []
+    http_method_names = ["post", "options"]
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "no-store"
+        return response
+
+    def post(self, request):
+        from rest_framework import serializers
+        from django.shortcuts import get_object_or_404
+        from .recovery import verify_voucher_payment, VoucherVerificationUnavailable, VoucherVerificationMismatch
+        class Input(serializers.Serializer):
+            reference = serializers.CharField(max_length=100)
+        serializer = Input(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payment = get_object_or_404(PaymentTransaction, reference=serializer.validated_data["reference"])
+        try:
+            payment = verify_voucher_payment(payment)
+        except VoucherVerificationUnavailable:
+            return Response({"detail": "Payment verification is temporarily unavailable. Check again; do not pay again if you were charged."}, status=503)
+        except VoucherVerificationMismatch:
+            return Response({"detail": "Payment details could not be matched. Contact the business before paying again."}, status=409)
+        return self.payment_response(payment)

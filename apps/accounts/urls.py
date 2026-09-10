@@ -1,9 +1,13 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from .registration_api import RegistrationEmailView, RegistrationVerifyView, RegistrationCreateView
 from .session_api import LogoutView
 
 urlpatterns = [
+    path("auth/registration/email/", RegistrationEmailView.as_view(), name="registration-email"),
+    path("auth/registration/email/verify/", RegistrationVerifyView.as_view(), name="registration-verify"),
+    path("auth/registration/", RegistrationCreateView.as_view(), name="registration-create"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("auth/login/", views.LoginView.as_view(), name="login"),
     path("auth/register/", views.RegisterView.as_view(), name="register"),

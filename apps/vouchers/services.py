@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
-from .models import Voucher, InternetPlan, PaymentTransaction, Radcheck
+from .models import Voucher, InternetPlan, PaymentTransaction, Radcheck, Radreply
 import secrets
 import string
 import hashlib
@@ -11,9 +11,18 @@ class VoucherService:
     """Core voucher operations."""
 
     @staticmethod
+    @transaction.atomic
     def write_radius_credentials(voucher):
         Radcheck.objects.create(username=voucher.username, attribute="Cleartext-Password", op=":=", value=voucher.password)
         Radcheck.objects.create(username=voucher.username, attribute="Max-Days", op=":=", value=str(voucher.plan.duration_hours * 3600))
+        # Explicit opt-in: preserve existing legacy vouchers and custom-rate issuance.
+        profile = voucher.plan.bandwidth_profile
+        snapshot = voucher.plan.rate_limit if profile and profile.rate_limit == voucher.plan.rate_limit else ""
+        if snapshot:
+            Radreply.objects.filter(username=voucher.username, attribute="Mikrotik-Rate-Limit").delete()
+            Radreply.objects.create(username=voucher.username, attribute="Mikrotik-Rate-Limit", op=":=", value=snapshot)
+        voucher.rate_limit_snapshot = snapshot
+        voucher.save(update_fields=["rate_limit_snapshot"])
         if voucher.plan.data_limit > 0:
             Radcheck.objects.create(username=voucher.username, attribute="Max-Total-Octets", op=":=", value=str(voucher.plan.data_limit * 1024 * 1024))
 
@@ -69,6 +78,7 @@ class VoucherService:
             expires_at__lte=now,
         )
         usernames = list(expired.values_list("username", flat=True))
+        speed_usernames = list(expired.exclude(rate_limit_snapshot="").values_list("username", flat=True))
         count = len(usernames)
         expired.update(status="expired")
 
@@ -76,6 +86,8 @@ class VoucherService:
         if usernames:
             Radcheck.objects.filter(username__in=usernames).delete()
 
+        if speed_usernames:
+            Radreply.objects.filter(username__in=speed_usernames, attribute="Mikrotik-Rate-Limit").delete()
         return count
 
     @staticmethod
@@ -85,6 +97,8 @@ class VoucherService:
         voucher.status = "disabled"
         voucher.save(update_fields=["status"])
         Radcheck.objects.filter(username=voucher.username).delete()
+        if voucher.rate_limit_snapshot:
+            Radreply.objects.filter(username=voucher.username, attribute="Mikrotik-Rate-Limit").delete()
         return True
 
 

@@ -18,7 +18,10 @@ from apps.core.mixins import AuditedCrudMixin
 from apps.core.api import audit
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
-from .models import Radcheck
+from .models import Radcheck, Radreply, BandwidthProfile
+from .serializers import BandwidthProfileSerializer
+from django.db.models import Count
+from django.db.models.deletion import ProtectedError
 
 
 class InternetPlanViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
@@ -30,7 +33,7 @@ class InternetPlanViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return InternetPlan.objects.none()
-        return InternetPlan.objects.filter(tenant=tenant_for(self.request))
+        return InternetPlan.objects.filter(tenant=tenant_for(self.request)).select_related("bandwidth_profile")
 
     def perform_create(self, serializer):
         serializer.save(tenant=tenant_for(self.request))
@@ -69,9 +72,12 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         if voucher.status != "unused" or hasattr(voucher, "payment") or hasattr(voucher, "agent_allocation"):
             raise ValidationError("Issued or purchased vouchers cannot be edited; use disable instead.")
         old_username = voucher.username
+        old_snapshot = voucher.rate_limit_snapshot
         serializer.instance = voucher
         voucher = serializer.save()
         Radcheck.objects.filter(username=old_username).delete()
+        if old_snapshot:
+            Radreply.objects.filter(username=old_username, attribute="Mikrotik-Rate-Limit").delete()
         VoucherService.write_radius_credentials(voucher)
 
     def perform_destroy(self, instance):
@@ -79,6 +85,8 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         if voucher.status != "unused" or hasattr(voucher, "payment") or hasattr(voucher, "agent_allocation"):
             raise ValidationError("Issued or purchased vouchers cannot be deleted; use disable instead.")
         Radcheck.objects.filter(username=voucher.username).delete()
+        if voucher.rate_limit_snapshot:
+            Radreply.objects.filter(username=voucher.username, attribute="Mikrotik-Rate-Limit").delete()
         voucher.delete()
 
     @action(detail=False, methods=["post"])
@@ -174,3 +182,32 @@ class PaymentTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return PaymentTransaction.objects.none()
         return PaymentTransaction.objects.filter(tenant=tenant_for(self.request))
+
+
+class BandwidthProfileViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
+    serializer_class = BandwidthProfileSerializer
+    filterset_fields = ["is_active"]
+    search_fields = ["name"]
+    ordering_fields = ["name", "created_at", "upload_kbps", "download_kbps"]
+    ordering = ["name", "id"]
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return BandwidthProfile.objects.none()
+        return BandwidthProfile.objects.filter(tenant=tenant_for(self.request)).annotate(plan_count=Count("plans"))
+
+    def get_permissions(self):
+        return [permissions.IsAuthenticated()] if self.action in ["list", "retrieve"] else [IsTenantManager()]
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=tenant_for(self.request))
+
+    def perform_update(self, serializer):
+        serializer.instance = BandwidthProfile.objects.select_for_update().get(pk=serializer.instance.pk)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        try:
+            instance.delete()
+        except ProtectedError:
+            raise ValidationError("This profile is used by plans. Deactivate it instead.")

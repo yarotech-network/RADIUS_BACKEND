@@ -18,7 +18,7 @@ from datetime import timedelta
 
 import requests
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import get_connection, send_mail
 from django.utils import timezone
 
 from .models import EmailVerificationCode
@@ -119,6 +119,12 @@ def build_verification_email(user, code):
     return subject, text, html
 
 
+def registration_console_notice(message):
+    """Development console feedback; never exposed through the public API."""
+    if getattr(settings, "REGISTRATION_EMAIL_BACKEND", "") == "django.core.mail.backends.console.EmailBackend":
+        print(f"[Registration OTP] {message}", flush=True)
+
+
 def send_verification_email(user, code):
     """Best-effort delivery: Resend when configured, Django email backend otherwise.
 
@@ -127,6 +133,14 @@ def send_verification_email(user, code):
     """
     subject, text, html = build_verification_email(user, code)
     try:
+        backend = getattr(settings, "REGISTRATION_EMAIL_BACKEND", "")
+        if backend:
+            registration_console_notice(f"Code: {code} | To: {user.email} | Expires in 10 minutes")
+            send_mail(
+                subject, text, settings.DEFAULT_FROM_EMAIL, [user.email],
+                connection=get_connection(backend), fail_silently=False, html_message=html,
+            )
+            return True
         if settings.RESEND_API_KEY:
             response = requests.post(
                 RESEND_ENDPOINT,

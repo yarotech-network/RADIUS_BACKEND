@@ -4,7 +4,28 @@ from django.utils import timezone
 import secrets
 
 
+class BandwidthProfile(models.Model):
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="bandwidth_profiles")
+    name = models.CharField(max_length=100)
+    upload_kbps = models.PositiveIntegerField()
+    download_kbps = models.PositiveIntegerField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(upload_kbps__gte=1, upload_kbps__lte=10000000), name="bandwidth_upload_range"),
+            models.CheckConstraint(condition=models.Q(download_kbps__gte=1, download_kbps__lte=10000000), name="bandwidth_download_range"),
+        ]
+
+    @property
+    def rate_limit(self):
+        return f"{self.upload_kbps}k/{self.download_kbps}k"
+
+
 class InternetPlan(models.Model):
+    bandwidth_profile = models.ForeignKey(BandwidthProfile, null=True, blank=True, on_delete=models.PROTECT, related_name="plans")
     name = models.CharField(max_length=100)
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="plans")
     price = models.PositiveIntegerField(help_text="Price in kobo")
@@ -27,6 +48,7 @@ class InternetPlan(models.Model):
 
 
 class Voucher(models.Model):
+    rate_limit_snapshot = models.CharField(max_length=20, blank=True, default="", db_default="")
     STATUS_CHOICES = [
         ("unused", "Unused"),
         ("active", "Active"),

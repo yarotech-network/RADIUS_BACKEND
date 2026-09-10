@@ -27,6 +27,8 @@ class NASDevice(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
+    model = models.CharField(max_length=80, blank=True, default="", db_default="")
+    routeros_version = models.CharField(max_length=40, blank=True, default="", db_default="")
     ip_address = models.GenericIPAddressField()
     nas_secret = models.TextField()
     wireguard_ip = models.GenericIPAddressField(blank=True, null=True)

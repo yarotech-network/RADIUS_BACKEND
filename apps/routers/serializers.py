@@ -14,11 +14,13 @@ class NASDeviceSerializer(serializers.ModelSerializer):
     routeros_password_encrypted = serializers.CharField(max_length=255, write_only=True, required=False, allow_blank=True, trim_whitespace=False)
     wireguard_port = serializers.IntegerField(min_value=1, max_value=65535, required=False)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
+    model = serializers.RegexField(r"^[A-Za-z0-9][A-Za-z0-9 +_.-]{0,79}$", required=False, allow_blank=True)
+    routeros_version = serializers.RegexField(r"^[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:[a-zA-Z0-9.-]*)?$", max_length=40, required=False, allow_blank=True)
 
     class Meta:
         model = NASDevice
         fields = [
-            "id", "name", "ip_address", "nas_secret", "wireguard_ip",
+            "id", "name", "model", "routeros_version", "ip_address", "nas_secret", "wireguard_ip",
             "wireguard_public_key", "wireguard_port", "routeros_username",
             "routeros_password_encrypted", "location", "tenant", "tenant_name",
             "onboarding_state", "deployment_status", "is_active",

@@ -11,6 +11,7 @@ EnvironmentFile=/etc/yarotech-radius/backend.env
 Environment=DJANGO_SETTINGS_MODULE=config.production_settings
 ExecStart=/opt/yarotech-radius/backend/venv/bin/python manage.py expire_vouchers
 ExecStart=/opt/yarotech-radius/backend/venv/bin/python manage.py expire_subscriptions
+ExecStart=/opt/yarotech-radius/backend/venv/bin/python manage.py reconcile_pppoe_services --limit 25
 PrivateTmp=true
 NoNewPrivileges=true
 ProtectSystem=strict
