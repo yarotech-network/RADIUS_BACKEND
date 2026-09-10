@@ -9,6 +9,12 @@ class TenantAdmin(admin.ModelAdmin):
     search_fields = ["name", "slug"]
     prepopulated_fields = {"slug": ("name",)}
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            from apps.subscriptions.trials import assign_new_tenant_trial
+            assign_new_tenant_trial(obj)
+
 
 @admin.register(TenantMembership)
 class TenantMembershipAdmin(admin.ModelAdmin):

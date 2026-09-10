@@ -613,3 +613,33 @@ This change does not add purchase ownership verification. Unused single-code
 vouchers remain retrievable by payment reference under the existing policy.
 First-login status still depends on the existing RADIUS activation integration.
 Previously viewed or copied credentials cannot be recalled by response redaction.
+
+
+## New tenant trial
+
+New workspaces created through email-first registration, legacy registration,
+platform tenant creation, or Django admin receive a 15-day trial starting at
+creation: 1 registered router, 50 distinct voucher print authorizations per
+Africa/Lagos calendar day, and no WhatsApp eligibility. Same-day reprints do not
+consume another allowance. This is a printing allowance, not an issuance quota.
+Platform administration workspaces are excluded.
+
+Assignment and creation commit together. The trial period snapshots its terms;
+repeated assignment cannot extend an existing subscription. Existing tenant
+subscriptions and legacy no-subscription access are not backfilled or changed.
+Trial expiry uses the existing entitlement checks; it does not disconnect customer
+sessions or delete purchased vouchers. Existing subscription purchase scheduling
+is unchanged: an early purchase begins after the current active period.
+
+Deployment: apply subscriptions.0006_subscriptionplan_internal_code before the
+new backend code. This adds a nullable unique catalogue identifier; it performs no
+tenant backfill. Review catalogue size and lock acquisition before production DDL.
+The hidden trial plan is created once on first signup, is not purchasable, and is
+excluded from platform catalogue CRUD. Roll out all tenant-creation writers before
+reopening signup; old writers still omit trial assignment. On code rollback retain
+the additive column and recorded trial periods, and pause new registration until
+trial assignment is restored. Do not reverse the schema while new code is running.
+
+Validation uses isolated local PostgreSQL test databases and mocked frontend APIs.
+Production migration, provider calls, and live router enforcement are separate
+operational checks; this change does not apply production configuration.

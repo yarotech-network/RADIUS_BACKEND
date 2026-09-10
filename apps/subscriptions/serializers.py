@@ -52,7 +52,7 @@ class TenantSubscriptionSerializer(serializers.ModelSerializer):
 class SubscriptionCheckoutSerializer(serializers.Serializer):
     plan_id = serializers.PrimaryKeyRelatedField(
         source="plan",
-        queryset=SubscriptionPlan.objects.filter(is_active=True),
+        queryset=SubscriptionPlan.objects.filter(is_active=True, internal_code__isnull=True),
     )
 
     def validate_plan_id(self, plan):

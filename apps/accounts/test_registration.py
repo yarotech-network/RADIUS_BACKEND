@@ -56,6 +56,15 @@ class RegistrationTests(RegistrationSetup, TestCase):
         self.assertIsNotNone(user.email_verified_at)
         self.assertEqual(user.first_name, 'Ada')
         self.assertEqual(user.membership.role, 'owner')
+        subscription = user.membership.tenant.subscription
+        self.assertEqual(subscription.status, 'trial')
+        self.assertTrue(subscription.is_trial)
+        self.assertEqual(subscription.expires_at - subscription.started_at, timedelta(days=15))
+        from apps.subscriptions.entitlements import entitlement_terms
+        terms = entitlement_terms(user.membership.tenant)
+        self.assertEqual(terms['max_routers'], 1)
+        self.assertEqual(terms['daily_voucher_print_limit'], 50)
+        self.assertFalse(terms['whatsapp_enabled'])
         self.assertEqual(self.client.post('/api/v1/auth/login/', {'username': user.username, 'password': 'RobustNetwork-6382!'}).status_code, 200)
         self.assertIn(self.client.post(BASE, self.details(token)).status_code, [400, 409])
         self.assertEqual(Tenant.objects.count(), 1)
@@ -110,6 +119,19 @@ class RegistrationTests(RegistrationSetup, TestCase):
             with self.assertRaises(RuntimeError): create_workspace(self.details(token))
         self.assertFalse(get_user_model().objects.exists())
         self.assertFalse(Tenant.objects.exists())
+        self.assertIsNone(RegistrationEmailChallenge.objects.get().consumed_at)
+        self.assertEqual(self.client.post(BASE, self.details(token)).status_code, 201)
+
+    def test_trial_failure_rolls_back_workspace_and_keeps_registration_retryable(self):
+        token = self.proof()
+        with patch('apps.subscriptions.trials.SubscriptionPeriod.objects.create', side_effect=RuntimeError('injected')):
+            with self.assertRaises(RuntimeError):
+                create_workspace(self.details(token))
+        from apps.subscriptions.models import TenantSubscription, SubscriptionPlan
+        self.assertFalse(Tenant.objects.exists())
+        self.assertFalse(get_user_model().objects.exists())
+        self.assertFalse(TenantSubscription.objects.exists())
+        self.assertFalse(SubscriptionPlan.objects.exists())
         self.assertIsNone(RegistrationEmailChallenge.objects.get().consumed_at)
         self.assertEqual(self.client.post(BASE, self.details(token)).status_code, 201)
 

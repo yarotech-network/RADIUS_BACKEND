@@ -17,6 +17,11 @@ class TenantViewSet(viewsets.ModelViewSet):
     filterset_fields = ["is_active", "is_platform_admin"]
     search_fields = ["name", "slug"]
 
+    @transaction.atomic
+    def perform_create(self, serializer):
+        from apps.subscriptions.trials import assign_new_tenant_trial
+        assign_new_tenant_trial(serializer.save())
+
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Tenant.objects.none()

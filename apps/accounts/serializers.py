@@ -85,6 +85,8 @@ class RegisterSerializer(serializers.Serializer):
             tenant=tenant,
             role="owner",
         )
+        from apps.subscriptions.trials import assign_new_tenant_trial
+        assign_new_tenant_trial(tenant)
         return user
 
 

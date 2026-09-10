@@ -28,4 +28,5 @@ class LimitsMigrationTests(TransactionTestCase):
             self.assertIsNone(period.terms["daily_voucher_print_limit"])
             self.assertTrue(period.terms["whatsapp_enabled"])
         finally:
-            MigrationExecutor(connection).migrate(after)
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())

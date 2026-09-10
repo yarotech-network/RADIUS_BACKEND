@@ -3,6 +3,7 @@ from django.utils import timezone
 
 
 class SubscriptionPlan(models.Model):
+    internal_code = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
     name = models.CharField(max_length=100)
     price = models.PositiveIntegerField(help_text="Price in kobo")
     duration_days = models.PositiveIntegerField()

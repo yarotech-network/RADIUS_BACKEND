@@ -30,7 +30,7 @@ from .serializers import (
 
 class SubscriptionPlanViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SubscriptionPlanSerializer
-    queryset = SubscriptionPlan.objects.filter(is_active=True)
+    queryset = SubscriptionPlan.objects.filter(is_active=True, internal_code__isnull=True)
     permission_classes = [permissions.AllowAny]
 
 
@@ -134,7 +134,7 @@ class PlanConflict(APIException):
 class BusinessPlanViewSet(viewsets.ModelViewSet):
     permission_classes = [IsPlatformAdmin]
     serializer_class = BusinessPlanSerializer
-    queryset = SubscriptionPlan.objects.all().order_by("price", "id")
+    queryset = SubscriptionPlan.objects.filter(internal_code__isnull=True).order_by("price", "id")
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
 
     @idempotent

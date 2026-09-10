@@ -105,6 +105,8 @@ def create_workspace(data):
     )
     tenant = Tenant.objects.create(name=data['tenant_name'], slug=data['workspace_id'], email=record.email, phone=data['phone'])
     TenantMembership.objects.create(user=user, tenant=tenant, role='owner')
+    from apps.subscriptions.trials import assign_new_tenant_trial
+    assign_new_tenant_trial(tenant)
     record.consumed_at = timezone.now()
     record.save(update_fields=['consumed_at'])
     return user, tenant

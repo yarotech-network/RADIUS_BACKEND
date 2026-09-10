@@ -42,6 +42,8 @@ class RegistrationTests(APITestCase):
         self.assertNotEqual(user.password, "StrongPass-4821")
         self.assertEqual(membership.role, "owner")
         self.assertEqual(membership.tenant.slug, "new-network")
+        self.assertEqual(membership.tenant.subscription.status, "trial")
+        self.assertEqual(membership.tenant.subscription.expires_at - membership.tenant.subscription.started_at, timedelta(days=15))
         # The account is created unverified: no tokens until the emailed OTP is confirmed.
         self.assertIsNone(user.email_verified_at)
         self.assertNotIn("access", response.data)
