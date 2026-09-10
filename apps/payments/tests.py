@@ -317,7 +317,7 @@ class PaymentPublicApiTests(APITestCase):
             generation_source="customer",
         )
         return PaymentTransaction.objects.create(
-            reference=f"ref-{code}", amount=self.plan.price, customer_email="buyer@example.com",
+            reference=f"ref-voucher-{voucher.pk}", amount=self.plan.price, customer_email="buyer@example.com",
             tenant=self.tenant, plan=self.plan, voucher=voucher, status="success",
         )
 
@@ -347,16 +347,38 @@ class PaymentPublicApiTests(APITestCase):
 
         used = self.fulfilled_payment("JKMNPQRT", voucher_status="active")
         body = self.client.get(reverse("payment-callback"), {"reference": used.reference}).json()
-        self.assertEqual(body["voucher"], "JKMNPQRT")
+        self.assertIsNone(body["voucher"])
+        self.assertTrue(body["fulfilled"])
+        self.assertNotIn("JKMNPQRT", json.dumps(body))
         self.assertIsNone(body["access_code"])
         self.assertFalse(body["code_revealed"])
 
         # Legacy vouchers with a separate password never leak it through the public endpoint.
         legacy = self.fulfilled_payment("legacyuser", password="separate-secret")
         body = self.client.get(reverse("payment-callback"), {"reference": legacy.reference}).json()
-        self.assertEqual(body["voucher"], "legacyuser")
+        self.assertIsNone(body["voucher"])
+        self.assertTrue(body["fulfilled"])
         self.assertIsNone(body["access_code"])
         self.assertNotIn("separate-secret", json.dumps(body))
+
+    def test_public_results_redact_all_non_unused_credentials(self):
+        for voucher_status in ("active", "expired", "disabled"):
+            payment = self.fulfilled_payment(f"SECRET-{voucher_status}", voucher_status=voucher_status)
+            for endpoint in ("payment-callback", "payment-verify"):
+                with self.subTest(voucher_status=voucher_status, endpoint=endpoint):
+                    if endpoint == "payment-callback":
+                        response = self.client.get(reverse(endpoint), {"reference": payment.reference})
+                    else:
+                        # Already fulfilled: verification returns without contacting Paystack.
+                        response = self.client.post(reverse(endpoint), {"reference": payment.reference}, format="json")
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response["Cache-Control"], "no-store")
+                    body = response.json()
+                    self.assertTrue(body["fulfilled"])
+                    self.assertIsNone(body["voucher"])
+                    self.assertIsNone(body["access_code"])
+                    self.assertFalse(body["code_revealed"])
+                    self.assertNotIn(payment.voucher.username, json.dumps(body))
 
     def test_credential_email_contains_code_plan_and_reference_once(self):
         payment = self.fulfilled_payment("WXYZ2346")

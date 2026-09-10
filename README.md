@@ -588,3 +588,28 @@ Set `PAYSTACK_CALLBACK_ORIGIN` to the frontend origin, for example `https://app.
 Every new checkout sends its own `callback_url`: voucher purchases return to `/pay/result`, tenant business subscriptions to `/settings/subscription`, and agent funding to `/agent/wallet/return`. Paystack appends the transaction reference. These routes are on the frontend, not `/api/v1/payments/callback/` (the JSON status endpoint). Previously initialized checkouts retain their original provider settings.
 
 Keep the existing Paystack webhook configured: browser return URLs do not settle payments or replace verified webhook handling. Confirm frontend SPA fallback serves these paths and authenticated users can return to their workspace.
+
+
+## Public payment result credential redaction
+
+The public callback and verification endpoints now return `fulfilled` independently
+of credential disclosure. Both `voucher` and `access_code` are null unless the
+payment succeeded and its voucher is unused and uses a single access code.
+`code_revealed` describes that same disclosure decision. Legacy separate-password
+vouchers also return no username. Authenticated voucher management is unchanged.
+
+Consumers must use `fulfilled` to decide whether issuance is complete; a null
+`voucher` no longer means fulfillment is pending. The top-level frontend supports
+older servers for fulfillment detection but never displays their legacy `voucher`
+value. It displays `access_code` only when `code_revealed` is explicitly true.
+
+Deploy the updated frontend before or alongside the backend to avoid old clients
+mistaking redacted completed purchases for pending issuance. Backend protection is
+required to close the API disclosure. No migration or router change is needed.
+Do not restore credential disclosure on rollback; retain the backend redaction and
+forward-fix client compatibility. The nested backend/frontend copy is not updated.
+
+This change does not add purchase ownership verification. Unused single-code
+vouchers remain retrievable by payment reference under the existing policy.
+First-login status still depends on the existing RADIUS activation integration.
+Previously viewed or copied credentials cannot be recalled by response redaction.

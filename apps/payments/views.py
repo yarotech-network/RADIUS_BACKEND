@@ -101,12 +101,15 @@ class PaymentCallbackView(APIView):
     def payment_response(self, transaction):
         reference = transaction.reference
         voucher = transaction.voucher
-        reveal = voucher is not None and voucher.status == "unused" and voucher.password == voucher.username
+        fulfilled = transaction.status == "success" and voucher is not None
+        reveal = fulfilled and voucher.status == "unused" and voucher.password == voucher.username
         response = Response({
             "status": transaction.status,
             "payment_verified": transaction.verified_at is not None,
             "reference": reference,
-            "voucher": voucher.username if voucher else None,
+            "fulfilled": fulfilled,
+            # A username is also the password for single-code vouchers.
+            "voucher": voucher.username if reveal else None,
             "access_code": voucher.username if reveal else None,
             "code_revealed": reveal,
             "plan": {"name": voucher.plan.name, "duration_hours": voucher.plan.duration_hours, "data_limit": voucher.plan.data_limit} if voucher else None,
