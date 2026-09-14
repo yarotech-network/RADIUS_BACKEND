@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import timedelta
 from unittest.mock import patch
+import re
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -9,6 +10,57 @@ from .hotspot_generator import quote
 from .models import NASDevice, RouterAuditEvent
 from .test_discovery import inventory
 from . import test_hotspot_setup
+
+
+def assert_hotspot_server_ownership(test, package):
+    """Regression for hardware rejecting comments on /ip hotspot, including cleanup."""
+    test.assertEqual(package['generator'], 'hotspot-lab-fresh-v8')
+    files = package['files']
+    test.assertIn('verbose=yes dry-run first', files['README.txt'])
+    test.assertNotIn('dry-run=yes', files['README.txt'])
+    for name in ('stage.rsc', 'activate.rsc', 'cleanup.rsc'):
+        statements = re.findall(r'/ip hotspot (?:add|find|set|remove|get)\b[^\n]*', files[name])
+        test.assertTrue(statements, name)
+        for statement in statements:
+            test.assertNotIn('comment=', statement, (name, statement))
+        nat_statements = re.findall(r'/ip firewall nat [^\n]*', files[name])
+        test.assertTrue(nat_statements, name)
+        for statement in nat_statements:
+            if 'src-address=' in statement:
+                test.assertIn('src-address="10.40.0.0/24"', statement)
+                if name == 'stage.rsc':
+                    test.assertIn('out-interface-list=WAN', statement)
+                else:
+                    test.assertNotIn('out-interface-list=WAN', statement)
+        if name != 'stage.rsc':
+            test.assertIn('out-interface-list]] != "WAN"', files[name])
+            test.assertIn('Duplicate package NAT rules', files[name])
+            test.assertIn('] = 1) do={ :if ([:tostr [/ip firewall nat get', files[name])
+            test.assertLess(files[name].index('Package NAT WAN list changed'), files[name].index('/ip firewall nat set '))
+    stage = files['stage.rsc']
+    test.assertIn(':set stagingResource "/ip hotspot"', stage)
+    test.assertIn('"Staging stopped while creating " . $stagingResource', stage)
+    server = next(line.strip() for line in stage.splitlines() if line.strip().startswith('/ip hotspot add '))
+    test.assertIn('disabled=yes', server)
+    test.assertIn('address-pool=none', server)
+    properties = server.removeprefix('/ip hotspot add ').replace(' disabled=yes', '').replace(' address-pool=none', '')
+    # Removal/enable must still match the complete server binding and settings.
+    selector = f'[/ip hotspot find where {properties}]'
+    test.assertIn(selector, files['activate.rsc'])
+    test.assertIn(f'/ip hotspot remove {selector}', files['cleanup.rsc'])
+    for name in ('activate.rsc', 'cleanup.rsc'):
+        text = files[name]
+        marker = re.search(r'/interface bridge find where [^\n]*comment="yarotech-lab:', text)
+        test.assertIsNotNone(marker, name)
+        mutation = text.index('/ip hotspot set ')
+        test.assertLess(marker.start(), mutation)
+        test.assertNotIn('address-pool=none', text)
+        test.assertIn('($hotspotPool != "") && ($hotspotPool != "none")', text)
+        test.assertIn('Duplicate Hotspot server', text)
+        test.assertLess(text.index('Hotspot address pool changed'), mutation)
+        test.assertIn('] = 1) do={ :local hotspotPool', text)
+    test.assertLess(files['cleanup.rsc'].index('Ownership conflict; cleanup refused'),
+                    files['cleanup.rsc'].index('/ip hotspot remove '))
 
 
 class HotspotLabPackageTests(APITestCase):
@@ -35,6 +87,7 @@ class HotspotLabPackageTests(APITestCase):
             self.assertEqual(first.status_code, 200, first.data)
             second = self.export()
         self.assertEqual(first.data, second.data)
+        assert_hotspot_server_ownership(self, first.data)
         self.assertEqual(self.export(dns_server='8.8.8.8').status_code, 409)
         self.assertEqual(first['Cache-Control'], 'no-store')
         self.assertEqual(set(first.data['files']), {'stage.rsc','activate.rsc','cleanup.rsc','README.txt'})
@@ -45,6 +98,8 @@ class HotspotLabPackageTests(APITestCase):
         self.assertIn('Management address does not match', stage)
         self.assertIn('7.20.1 (stable)', stage)
         self.assertIn('RADIUS must use', stage)
+        for name in ('stage.rsc', 'activate.rsc', 'cleanup.rsc'):
+            self.assertIn('use-radius=yes radius-accounting=yes radius-interim-update=5m', first.data['files'][name])
         commands = [line for line in stage.splitlines() if ' add ' in line]
         self.assertTrue(commands)
         for line in commands:

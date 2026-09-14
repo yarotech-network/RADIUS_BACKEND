@@ -80,3 +80,75 @@ class IoTDeviceTests(APITestCase):
         listed = self.client.get(reverse("iot-device-list"))
         self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual([item["id"] for item in listed.data["results"]], [own.id])
+
+    def test_router_bound_permanent_access_and_tenant_validation(self):
+        from apps.routers.models import NASDevice
+        own = NASDevice.objects.create(tenant=self.a, name="Lab", ip_address="192.0.2.10")
+        other = NASDevice.objects.create(tenant=self.b, name="Other", ip_address="192.0.2.11")
+        self.client.force_authenticate(self.manager)
+        response = self.client.post(reverse("iot-device-list"), self.payload(
+            router=str(own.pk), access_type="permanent", vlan_id=42, description="Lobby camera", expires_at=None,
+        ), format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(response.data["expires_at"])
+        self.assertEqual(response.data["router_name"], "Lab")
+        self.assertEqual(response.data["vlan_id"], 42)
+        detail = reverse("iot-device-detail", args=[response.data["id"]])
+        for payload in [{"router": str(other.pk)}, {"vlan_id": 4095}, {"access_type": "timed", "expires_at": None}]:
+            rejected = self.client.patch(detail, payload, format="json")
+            self.assertEqual(rejected.status_code, 400, rejected.data)
+        device = MacDevice.objects.get(pk=response.data["id"])
+        self.assertEqual(device.router_id, own.pk)
+        self.assertEqual(device.access_type, "permanent")
+        filtered = self.client.get(reverse("iot-device-list"), {"router": str(other.pk)})
+        self.assertEqual(filtered.data["count"], 0)
+
+
+from rest_framework.test import APITransactionTestCase
+from django.db import connection
+from apps.vouchers.models import Radacct
+from apps.routers.models import NASDevice
+from .accounting import device_accounting
+
+
+class DeviceAccountingTests(APITransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.created_accounting = Radacct._meta.db_table not in connection.introspection.table_names()
+        if cls.created_accounting:
+            with connection.schema_editor() as editor:
+                editor.create_model(Radacct)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.created_accounting:
+            with connection.schema_editor() as editor:
+                editor.delete_model(Radacct)
+        super().tearDownClass()
+
+    def test_usage_matches_normalized_mac_and_assigned_tenant_router(self):
+        Radacct.objects.all().delete()
+        tenant = Tenant.objects.create(name="Lab", slug="lab")
+        other = Tenant.objects.create(name="Other", slug="other")
+        plan = InternetPlan.objects.create(tenant=tenant, name="IoT", price=1000, duration_hours=24)
+        router = NASDevice.objects.create(tenant=tenant, name="Lab", ip_address="192.0.2.20")
+        NASDevice.objects.create(tenant=other, name="Other", ip_address="192.0.2.21")
+        device = MacDevice.objects.create(tenant=tenant, plan=plan, router=router, device_name="Camera", mac_address="AA:BB:CC:DD:EE:FF", access_type="permanent")
+        now = timezone.now()
+        for username, ip, stopped, incoming in [
+            ("aa-bb-cc-dd-ee-ff", "192.0.2.20", None, 100),
+            ("AABB.CCDD.EEFF", "192.0.2.20", now, 200),
+            ("AABBCCDDEEFF", "192.0.2.21", None, 9999),
+            ("112233445566", "192.0.2.20", None, 9999),
+        ]:
+            Radacct.objects.create(sessionid=username, username=username, nasipaddress=ip,
+                acctstarttime=now, acctstoptime=stopped, acctinputoctets=incoming, acctoutputoctets=10)
+        data = device_accounting([device], tenant)[device.pk]
+        self.assertTrue(data["available"])
+        self.assertEqual(data["session_count"], 2)
+        self.assertEqual(data["open_sessions"], 1)
+        self.assertEqual(data["bytes_total"], 320)
+        device.router = None
+        self.assertIsNone(device_accounting([device], tenant)[device.pk]["bytes_total"])
+        Radacct.objects.all().delete()

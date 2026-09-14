@@ -57,3 +57,31 @@ class PPPoEService(models.Model):
     class Meta:
         ordering = ["id"]
         indexes = [models.Index(fields=["lease_until", "last_reconciled_at"], name="pppoe_reconcile_idx")]
+
+
+class DeviceAccessSession(models.Model):
+    """Durable accounting evidence; reconnects are sessions, not voucher purchases."""
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE)
+    voucher = models.ForeignKey("vouchers.Voucher", on_delete=models.PROTECT)
+    source_key = models.CharField(max_length=64, unique=True)
+    mac_address = models.CharField(max_length=17)
+    router_name = models.CharField(max_length=200, blank=True)
+    nas_address = models.GenericIPAddressField()
+    started_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField()
+    stopped_at = models.DateTimeField(null=True)
+    bytes_in = models.PositiveBigIntegerField(default=0)
+    bytes_out = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["tenant", "mac_address", "voucher"], name="device_access_mac_code_idx"),
+            models.Index(fields=["tenant", "last_seen_at"], name="device_access_seen_idx"),
+        ]
+
+
+class DeviceAccessSync(models.Model):
+    # Singleton lock and operational status; no raw access codes in diagnostics.
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    completed_at = models.DateTimeField(null=True)
+    missing_mac_rows = models.PositiveIntegerField(default=0)

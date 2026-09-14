@@ -181,6 +181,7 @@ class Radreply(models.Model):
 
 
 class Radacct(models.Model):
+    callingstationid = models.CharField(max_length=64, null=True, blank=True)
     radacctid = models.BigAutoField(primary_key=True)
     sessionid = models.CharField(max_length=64)
     username = models.CharField(max_length=64)

@@ -167,7 +167,7 @@ class DiscoveryApiTests(APITestCase):
         self.assertEqual(set(event.details), {'code','actor_id'})
 
     def test_changed_router_during_collection_does_not_commit_snapshot(self):
-        def changed(_router):
+        def changed(_router, connection_mode="wireguard"):
             NASDevice.objects.filter(pk=self.router.pk).update(updated_at=timezone.now())
             return inventory()
         with patch('apps.routers.hotspot_api.collect', side_effect=changed):
@@ -175,7 +175,7 @@ class DiscoveryApiTests(APITestCase):
         self.assertFalse(RouterAuditEvent.objects.filter(action='hotspot.inventory_discovered').exists())
 
     def test_out_of_order_discovery_cannot_replace_newer_result(self):
-        def newer(_router):
+        def newer(_router, connection_mode="wireguard"):
             RouterAuditEvent.objects.create(router=self.router, action='hotspot.inventory_discovered', details={'router_version':self.router.updated_at.isoformat(),'inventory':inventory()})
             return inventory()
         with patch('apps.routers.hotspot_api.collect', side_effect=newer):

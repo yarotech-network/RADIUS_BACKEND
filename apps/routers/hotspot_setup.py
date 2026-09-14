@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import RouterAuditEvent
+from .local_lan import approved_target
 from .discovery import latest_inventory, compatibility
 
 VERSION = "hotspot-review-v1"
@@ -41,11 +42,23 @@ class HotspotIntentSerializer(StrictSerializer):
     hotspot_name = serializers.RegexField(NAME)
     profile_name = serializers.RegexField(NAME)
     gateway = serializers.CharField(max_length=32)
-    radius_server = serializers.IPAddressField(protocol="IPv4")
+    authentication_mode = serializers.ChoiceField(choices=["radius", "local_user"], default="radius")
+    radius_server = serializers.IPAddressField(protocol="IPv4", required=False, allow_blank=True, default="")
     interfaces = InterfaceSerializer(many=True, min_length=2, max_length=64)
     inventory_confirmed = serializers.BooleanField()
 
     def validate(self, data):
+        if data['authentication_mode'] == 'radius' and not data['radius_server']:
+            raise serializers.ValidationError({'radius_server': 'A RADIUS server is required for RADIUS authentication.'})
+        if data['authentication_mode'] == 'local_user':
+            router = self.context.get('router')
+            observed = latest_inventory(router) if router else None
+            if (data['mode'] != 'fresh' or not data.get('inventory_id') or not observed
+                    or observed.get('connection_mode') != 'local_lan'
+                    or not approved_target(router) or observed.get('local_target') != approved_target(router)):
+                raise serializers.ValidationError({'authentication_mode': 'Local-user lab mode requires a fresh setup with approved local LAN discovery.'})
+            if data['radius_server']:
+                raise serializers.ValidationError({'radius_server': 'Leave RADIUS server empty in local-user lab mode.'})
         if not data["inventory_confirmed"]:
             raise serializers.ValidationError({"inventory_confirmed": "Confirm the inventory against this router before reviewing."})
         ports = data["interfaces"]
@@ -102,15 +115,17 @@ class HotspotIntentSerializer(StrictSerializer):
 def candidate(data):
     """All candidate commands are comments; the first statement aborts pasted/imported files."""
     commands = []
+    local_user = data.get('authentication_mode', 'radius') == 'local_user'
+    radius_flag = 'no' if local_user else 'yes'
     bridge = data["bridge"]
     if data["mode"] == "fresh":
         commands.append(f'/interface bridge add name="{bridge}" comment="Yarotech Hotspot"')
         commands.extend(f'/interface bridge port add bridge="{bridge}" interface="{p["name"]}"' for p in data["interfaces"] if p["role"] == "client")
         commands.append(f'/ip address add address="{data["gateway"]}" interface="{bridge}"')
-        commands.append(f'/ip hotspot profile add name="{data["profile_name"]}" use-radius=yes radius-accounting=yes')
+        commands.append(f'/ip hotspot profile add name="{data["profile_name"]}" use-radius={radius_flag} radius-accounting={radius_flag}')
         commands.append(f'/ip hotspot add name="{data["hotspot_name"]}" interface="{bridge}" profile="{data["profile_name"]}" disabled=yes')
     else:
-        commands.append(f'/ip hotspot profile set [find where name="{data["profile_name"]}"] use-radius=yes radius-accounting=yes')
+        commands.append(f'/ip hotspot profile set [find where name="{data["profile_name"]}"] use-radius={radius_flag} radius-accounting={radius_flag}')
     return '\n'.join([
         ':error "REVIEW ONLY: this artifact is not an executable installation or migration"',
         f'# Generator: {VERSION}',
@@ -118,7 +133,7 @@ def candidate(data):
         '# inventory preconditions, idempotent execution and rollback require lab validation.',
         '# No credentials are included. Do not remove this guard to deploy.',
         *["# " + command for command in commands],
-        f'# RADIUS destination to validate: {data["radius_server"]}',
+        "# Local-user lab only; system voucher login and RADIUS accounting are NOT verified." if local_user else f'# RADIUS destination to validate: {data["radius_server"]}',
     ])
 
 
@@ -140,6 +155,7 @@ def valid_intent(router, event):
 
 
 def setup_result(router):
+    from .lab_verification import result as lab_result
     event = router.audit_events.filter(action="hotspot.intent_created").first()
     intent = None
     if event:
@@ -157,14 +173,17 @@ def setup_result(router):
         }
     checks = {c.check_type: c for c in router.onboarding_checks.filter(check_type__in=REQUIRED_CHECKS)}
     evidence = []
-    for kind in REQUIRED_CHECKS:
+    observed = latest_inventory(router)
+    required_checks = ('radius_auth', 'radius_acct') if observed and observed.get('connection_mode') == 'local_lan' else REQUIRED_CHECKS
+    for kind in required_checks:
         check = checks.get(kind)
         fresh = bool(check and event and check.checked_at >= event.created_at and timezone.now() - timedelta(minutes=10) <= check.checked_at <= timezone.now())
         evidence.append({"check_type": kind, "passed": bool(check and check.passed and fresh), "checked_at": check.checked_at if check else None, "fresh": fresh})
     observed = latest_inventory(router)
     return {"device_profile": {"model": router.model, "routeros_version": router.routeros_version},
+            "local_lan_available": approved_target(router) is not None,
             "discovery": observed, "compatibility": compatibility(router, observed),
             "version": VERSION, "execution_enabled": False, "supported_targets": [],
             "gate": "Production execution requires hardware validation. Fresh-install laboratory packages are available separately.",
             "inventory_source": "routeros_https" if intent and intent["configuration"].get("inventory_id") else "operator_confirmed", "intent": intent, "evidence": evidence,
-            "ready": False}
+            "local_lab": lab_result(router), "ready": False}

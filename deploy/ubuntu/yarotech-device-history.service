@@ -1,0 +1,16 @@
+[Unit]
+Description=Import Yarotech device access-code history
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=yarotech
+Group=www-data
+WorkingDirectory=/opt/yarotech-radius/backend
+EnvironmentFile=/etc/yarotech-radius/backend.env
+Environment=DJANGO_SETTINGS_MODULE=config.production_settings
+ExecStart=/opt/yarotech-radius/backend/venv/bin/python manage.py sync_device_access
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

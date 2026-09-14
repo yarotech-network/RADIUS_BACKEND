@@ -241,3 +241,8 @@ ROUTER_DISCOVERY_CA_BUNDLE = config("ROUTER_DISCOVERY_CA_BUNDLE", default="")
 
 # Private FreeRADIUS PAP integration; unset disables the decision endpoint.
 PPPOE_RADIUS_TOKEN = config("PPPOE_RADIUS_TOKEN", default="")
+
+# Explicit local laboratory approval, keyed by router UUID (never a tenant-supplied URL).
+import json
+ROUTER_LOCAL_LAN_TARGETS = config("ROUTER_LOCAL_LAN_TARGETS", default="{}", cast=json.loads)
+ROUTER_LOCAL_LAN_WIFI_EXTENSIONS = config("ROUTER_LOCAL_LAN_WIFI_EXTENSIONS", default="{}", cast=json.loads)

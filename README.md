@@ -674,3 +674,10 @@ writers together; old code does not honor snapshots. Retain the additive columns
 and saved terms on rollback, and pause new checkout/fulfillment if reverting to an
 older writer until snapshot-aware code is restored. No frontend contract change is
 required: existing displayed plan fields now contain the purchased values.
+
+### Local LAN laboratory onboarding
+
+For a physical router connected directly to the backend computer, see
+[Local LAN onboarding](LOCAL_LAN_ONBOARDING.md). This opt-in mode uses
+operator-approved HTTPS discovery and preserves management interface protection
+without marking a WireGuard deployment successful.

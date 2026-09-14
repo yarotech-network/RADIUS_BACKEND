@@ -12,9 +12,11 @@ from .models import NASDevice, RouterAuditEvent
 
 
 class SetupResultSerializer(serializers.Serializer):
+    local_lab = serializers.JSONField()
     device_profile = serializers.DictField(child=serializers.CharField(allow_blank=True))
     compatibility = serializers.JSONField()
     discovery = serializers.JSONField(allow_null=True)
+    local_lan_available = serializers.BooleanField()
     version = serializers.CharField()
     execution_enabled = serializers.BooleanField()
     supported_targets = serializers.ListField(child=serializers.CharField())
@@ -26,6 +28,7 @@ class SetupResultSerializer(serializers.Serializer):
 
 
 class DiscoveryRequestSerializer(StrictSerializer):
+    connection_mode = serializers.ChoiceField(choices=["wireguard", "local_lan"], default="wireguard")
     expected_updated_at = serializers.DateTimeField()
 
 
@@ -54,6 +57,10 @@ class RevokeIntentSerializer(serializers.Serializer):
     intent_id = serializers.UUIDField()
 
 
+class VerifyLabSerializer(StrictSerializer):
+    intent_id = serializers.UUIDField()
+
+
 def private_response(data, status=200):
     response = Response(data, status=status)
     response["Cache-Control"] = "no-store"
@@ -61,6 +68,41 @@ def private_response(data, status=200):
 
 
 class HotspotSetupActions:
+    @extend_schema(request=VerifyLabSerializer, responses=SetupResultSerializer)
+    @action(detail=True, methods=['post'], url_path='hotspot-setup/verify-local-lab', throttle_classes=[ScopedRateThrottle], throttle_scope='router_discovery')
+    def verify_local_lab(self, request, pk=None):
+        from .lab_verification import package_context, collect_lab, approved_wifi
+        router = self.get_object()
+        serializer = VerifyLabSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        context = package_context(router)
+        if not context or context[0].pk != serializer.validated_data['intent_id']:
+            return private_response({'detail': 'An approved, current local-user lab package is required.'}, 409)
+        if router.deployment_status == 'deploying' or router.operations.filter(status__in=['pending', 'running']).exists():
+            return private_response({'detail': 'Wait for the current provisioning operation.'}, 409)
+        started = timezone.now()
+        wifi = approved_wifi(router, context)
+        details = {'intent_id': str(context[0].pk), 'target': context[1],
+                   'wifi_interfaces': wifi,
+                   'router_version': router.updated_at.isoformat(), 'actor_id': request.user.pk}
+        try:
+            checks = collect_lab(router, context)
+            details.update(checks=checks, status='verified' if checks and all(c['passed'] for c in checks) else 'incomplete')
+        except DiscoveryError as error:
+            details.update(checks=[], status='unreachable', code=error.code)
+        with transaction.atomic():
+            current = NASDevice.objects.select_for_update().get(pk=router.pk)
+            now_context = package_context(current)
+            if (current.updated_at != router.updated_at or not now_context
+                    or now_context[0].pk != context[0].pk or now_context[1] != context[1]
+                    or approved_wifi(current, now_context) != wifi
+                    or current.deployment_status == 'deploying'
+                    or current.operations.filter(status__in=['pending', 'running']).exists()
+                    or current.audit_events.filter(action='hotspot.lab_verified', created_at__gte=started).exists()):
+                return private_response({'detail': 'Router or verification changed. Refresh and retry.'}, 409)
+            RouterAuditEvent.objects.create(router=current, action='hotspot.lab_verified', details=details)
+            return private_response(setup_result(current))
+
     @extend_schema(request=LabPackageRequestSerializer, responses=LabPackageResultSerializer)
     @action(detail=True, methods=["post"], url_path="hotspot-setup/lab-package", throttle_classes=[ScopedRateThrottle], throttle_scope="router_hotspot_setup")
     def export_hotspot_lab_package(self, request, pk=None):
@@ -81,7 +123,7 @@ class HotspotSetupActions:
             package = generate(router, result, values['dns_server'])
             previous = router.audit_events.filter(action='hotspot.lab_package_exported', details__intent_id=package['id']).first()
             if previous and previous.details.get('sha256') != package['sha256']:
-                return private_response({'detail':'This review already has a different package. Revoke it and save a new review before changing the DNS server.'}, 409)
+                return private_response({'detail':'This review already has a different package. Revoke it and save a new review to use changed DNS settings or a new generator version.'}, 409)
             RouterAuditEvent.objects.get_or_create(router=router, action='hotspot.lab_package_exported', details={
                 'intent_id':package['id'], 'generator':package['generator'], 'sha256':package['sha256'], 'actor_id':request.user.pk,
             })
@@ -100,7 +142,7 @@ class HotspotSetupActions:
             return private_response({"detail": "Wait for the current provisioning operation."}, 409)
         started = timezone.now()
         try:
-            inventory = collect(router)
+            inventory = collect(router, connection_mode=serializer.validated_data["connection_mode"])
         except DiscoveryError as error:
             # Keep previous inventory. Store only a fixed error code, never HTTP bodies or credentials.
             RouterAuditEvent.objects.create(router=router, action="hotspot.discovery_failed", details={"code": error.code, "actor_id": request.user.pk})

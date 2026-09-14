@@ -7,7 +7,11 @@ class MacDevice(models.Model):
     plan = models.ForeignKey("vouchers.InternetPlan", on_delete=models.PROTECT, related_name="mac_devices")
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="mac_devices")
     is_active = models.BooleanField(default=True)
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
+    router = models.ForeignKey("routers.NASDevice", on_delete=models.PROTECT, null=True, blank=True, related_name="mac_devices")
+    access_type = models.CharField(max_length=16, choices=[("permanent", "Permanent"), ("timed", "Time limited")], default="timed")
+    vlan_id = models.PositiveSmallIntegerField(null=True, blank=True)
+    description = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,4 +1,4 @@
-"""Bounded, read-only RouterOS discovery over a verified management VPN endpoint."""
+"""Bounded, read-only RouterOS discovery over an approved VPN or local LAN endpoint."""
 import ipaddress
 import json
 import re
@@ -10,6 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .secret_store import secret_store
+from .local_lan import approved_target, preparation_review
 
 VERSION = "routeros-rest-inventory-v1"
 # Query only non-secret properties. Never collect exports, users, RADIUS secrets or scripts.
@@ -30,6 +31,7 @@ TABLES = {
 }
 MESSAGES = {
     "not_configured": "Discovery requires an administrator-approved management VPN destination.",
+    "local_not_approved": "Local LAN discovery requires an operator-approved router ID, exact private IP and protected interfaces.",
     "vpn_required": "Provision the management VPN before running discovery.",
     "credentials_required": "Set the RouterOS username and password before running discovery.",
     "tls_failed": "Router certificate verification failed. Configure a trusted certificate or CA bundle.",
@@ -47,7 +49,17 @@ class DiscoveryError(Exception):
         super().__init__(MESSAGES[code])
 
 
-def destination(router):
+def destination(router, connection_mode="wireguard"):
+    if connection_mode == "local_lan":
+        target = approved_target(router)
+        if not target:
+            raise DiscoveryError("local_not_approved")
+        port = getattr(settings, "ROUTER_DISCOVERY_HTTPS_PORT", 443)
+        if not isinstance(port, int) or not 1 <= port <= 65535:
+            raise DiscoveryError("not_configured")
+        return f"https://{target['address']}:{port}/rest"
+    if connection_mode != "wireguard":
+        raise DiscoveryError("not_configured")
     if router.deployment_status != "deployed" or not router.wireguard_ip or not router.is_active:
         raise DiscoveryError("vpn_required")
     try:
@@ -113,8 +125,8 @@ def read_table(session, url, fields, deadline, optional=False, filters=None):
         raise DiscoveryError("invalid_response") from None
 
 
-def collect(router):
-    base = destination(router)
+def collect(router, connection_mode="wireguard"):
+    base = destination(router, connection_mode)
     if not router.routeros_username or not router.routeros_password_encrypted:
         raise DiscoveryError("credentials_required")
     try:
@@ -131,10 +143,17 @@ def collect(router):
             tables[name] = read_table(session, f"{base}/{path}", fields, deadline,
                                       optional=name not in ("resource", "interfaces"),
                                       filters={"dst-address": "0.0.0.0/0"} if name == "routes" else None)
-    return normalize(tables, router.wireguard_ip)
+    target = approved_target(router) if connection_mode == "local_lan" else None
+    management_ip = target['address'] if target else router.wireguard_ip
+    result = normalize(tables, management_ip, target)
+    result.update(connection_mode=connection_mode, management_ip=str(management_ip))
+    if target:
+        result['local_target'] = target
+        result['preparation'] = preparation_review(target, result)
+    return result
 
 
-def normalize(tables, management_ip):
+def normalize(tables, management_ip, local_target=None):
     resource = tables.get("resource") or []
     raw_interfaces = tables.get("interfaces") or []
     if len(resource) != 1 or not raw_interfaces or len(raw_interfaces) > 256:
@@ -183,6 +202,9 @@ def normalize(tables, management_ip):
     for row in tables.get("addresses") or []:
         if row.get("address", "").split('/')[0] == management_ip:
             protect(row.get("interface"), "management")
+    if local_target:
+        protect(local_target['management_interface'], 'management')
+        protect(local_target['wan_interface'], 'wan')
     # Conservatively protect the entire connected bridge/VLAN/bond topology of an uplink.
     for origin, item in interfaces.items():
         for reason in list(item["protected_reasons"]):
@@ -229,6 +251,20 @@ def compatibility(router, inventory):
             reasons.append("The reported model differs from the registered model. Review the target identity.")
         if router.routeros_version and router.routeros_version != version:
             reasons.append("The reported RouterOS version differs from the registered version.")
+        if inventory.get('connection_mode') == 'local_lan':
+            target = approved_target(router)
+            if not target or target != inventory.get('local_target'):
+                reasons.append("Local LAN approval changed; obtain approval and discover again.")
+            else:
+                ports = {p['name']: p for p in inventory['interfaces']}
+                management = ports.get(target['management_interface'])
+                wan = ports.get(target['wan_interface'])
+                if not management or not wan or management['disabled'] or management['type'] != 'ether' or wan['type'] != 'ether':
+                    reasons.append("Approved management and WAN Ethernet interfaces must be present; management must be enabled.")
+                elif wan['bridge']:
+                    reasons.append("Separate the approved WAN port from existing bridges before lab export.")
+                elif not any(row.get('address', '').split('/')[0] == target['address'] and row.get('interface') in (management['name'], management['bridge']) for row in inventory.get('addresses', [])):
+                    reasons.append("The approved management port does not carry the registered LAN address.")
         if inventory["unavailable_sections"]:
             reasons.append("Some inventory sections could not be read; topology and feature checks are incomplete.")
         if inventory["hotspot_allowed"] is not True:
