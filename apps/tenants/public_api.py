@@ -20,7 +20,7 @@ class PublicPlanSerializer(serializers.ModelSerializer):
     duration_hours = serializers.DecimalField(max_digits=16, decimal_places=6, coerce_to_string=False, read_only=True)
     class Meta:
         model = InternetPlan
-        fields = ["id", "name", "price", "duration_hours", "rate_limit", "data_limit", "max_devices"]
+        fields = ["id", "name", "price", "duration_hours", "rate_limit", "data_limit", "max_devices", "plan_type"]
 
 
 class PublicTenantView(generics.RetrieveAPIView):
@@ -49,4 +49,9 @@ class PublicPlansView(generics.ListAPIView):
         from apps.subscriptions.access import tenant_access
         if tenant_access(tenant)["required"]:
             return InternetPlan.objects.none()
-        return InternetPlan.objects.filter(tenant=tenant, is_active=True, is_public=True, archived_at__isnull=True, plan_type='voucher')
+        from django.conf import settings
+        from django.db.models import Q
+        query = InternetPlan.objects.filter(tenant=tenant, is_active=True, is_public=True, archived_at__isnull=True)
+        if getattr(settings, 'IOT_PUBLIC_PURCHASE_ENABLED', False) and getattr(settings, 'RADIUS_REST_ENABLED', False):
+            return query.filter(Q(plan_type='voucher') | Q(plan_type='iot_mac', public_router__is_active=True, public_router__tenant=tenant, public_router__onboarding_state='active'))
+        return query.filter(plan_type='voucher')

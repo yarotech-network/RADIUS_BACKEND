@@ -20,17 +20,24 @@ from apps.core.models import ApiCommand, AuditEvent
 User = get_user_model()
 
 
-class ApiWorkflowTests(APITestCase):
+from apps.vouchers.radius_test_support import RadiusTablesMixin
+from apps.subscriptions.test_support import grant_test_subscription
+from apps.vouchers.terms import snapshot_plan
+
+
+class ApiWorkflowTests(RadiusTablesMixin, APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Alpha", slug="alpha")
         self.other = Tenant.objects.create(name="Beta", slug="beta")
+        grant_test_subscription(self.tenant)
+        grant_test_subscription(self.other)
         self.owner = User.objects.create_user("owner", "owner@example.com", "Strong-Password-2819")
         TenantMembership.objects.create(user=self.owner, tenant=self.tenant, role="owner")
         self.admin = User.objects.create_user("admin", "admin@example.com", "Strong-Password-2819", is_platform_admin=True)
         self.staff = User.objects.create_user("staff", "staff@example.com", "Strong-Password-2819")
         self.plan = InternetPlan.objects.create(tenant=self.tenant, name="Daily", price=5000, duration_hours=24, rate_limit="1M/1M")
         self.router = NASDevice.objects.create(tenant=self.tenant, name="Router", ip_address="192.0.2.1", nas_secret=secret_store.encrypt("original-secret"), wireguard_ip="10.100.100.2", wireguard_public_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-        self.payment = PaymentTransaction.objects.create(tenant=self.tenant, plan=self.plan, reference="original-payment", amount=5000, customer_email="buyer@example.com")
+        self.payment = PaymentTransaction.objects.create(tenant=self.tenant, plan=self.plan, reference="original-payment", amount=5000, customer_email="buyer@example.com", purchased_terms=snapshot_plan(self.plan))
         self.client.force_authenticate(self.owner)
 
     def post(self, path, data=None, key=None):
@@ -170,7 +177,7 @@ class ApiWorkflowTests(APITestCase):
         self.assertNotIn("cpu_load", result.data)
 
     @patch("apps.vouchers.services.Radcheck.objects.create")
-    @patch("apps.payments.recovery_api.get_paystack_service")
+    @patch("apps.payments.recovery_api.get_payment_paystack_service")
     def test_recovery_verifies_original_payment_and_issues_only_one_voucher(self, service, radius):
         service.return_value.verify_transaction.return_value = {"data": {"reference": self.payment.reference, "status": "success", "amount": 5000, "currency": "NGN"}}
         path = f"payment-recovery/{self.payment.pk}/retry/"
@@ -183,7 +190,7 @@ class ApiWorkflowTests(APITestCase):
         service.return_value.initialize_transaction.assert_not_called()
         service.return_value.verify_transaction.assert_called_with("original-payment")
 
-    @patch("apps.payments.recovery_api.get_paystack_service")
+    @patch("apps.payments.recovery_api.get_payment_paystack_service")
     def test_wrong_amount_never_fulfills_payment(self, service):
         service.return_value.verify_transaction.return_value = {"data": {"reference": self.payment.reference, "status": "success", "amount": 1, "currency": "NGN"}}
         self.assertEqual(self.post(f"payment-recovery/{self.payment.pk}/retry/").status_code, 409)
@@ -288,7 +295,7 @@ class ApiWorkflowTests(APITestCase):
         self.assertFalse(run_one_delivery())
         send.assert_called_once()
 
-    @patch("apps.payments.recovery_api.get_paystack_service")
+    @patch("apps.payments.recovery_api.get_payment_paystack_service")
     @patch("apps.payments.recovery.VoucherService.generate_vouchers", side_effect=RuntimeError("private failure"))
     def test_failed_fulfillment_retains_verified_payment_evidence(self, generate, service):
         service.return_value.verify_transaction.return_value = {"data": {"reference": self.payment.reference, "status": "success", "amount": 5000, "currency": "NGN"}}

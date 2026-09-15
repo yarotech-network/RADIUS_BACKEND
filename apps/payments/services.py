@@ -15,8 +15,8 @@ def get_paystack_secret(tenant=None):
 
 
 def get_payment_paystack_service(payment):
-    """WhatsApp orders retain the account that initialized their transaction."""
-    order = getattr(payment, 'whatsapp_order', None)
+    """WhatsApp and IoT orders retain the account that initialized their transaction."""
+    order = getattr(payment, 'iot_purchase', None) or getattr(payment, 'whatsapp_order', None)
     if order:
         from apps.routers.secret_store import secret_store
         return PaystackService(secret_key=secret_store.decrypt(order.payment_secret_encrypted))

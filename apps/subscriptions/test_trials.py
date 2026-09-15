@@ -43,7 +43,7 @@ class SignupTrialTests(APITestCase):
         self.assertEqual(self.client.post('/api/v1/vouchers/authorize-print/', {'voucher_ids': ids}, format='json').status_code, 200)
         self.assertEqual(self.client.post('/api/v1/vouchers/authorize-print/', {'voucher_ids': [vouchers[-1].pk]}, format='json').status_code, 403)
         self.assertEqual(self.client.post('/api/v1/whatsapp/routes/', {
-            'phone_number_id': 'test', 'access_token_encrypted': 'test-only',
+            'phone_number_id': '123456789', 'access_token_encrypted': 'test-only',
         }).status_code, 403)
         with patch('apps.subscriptions.entitlements.timezone.now', return_value=timezone.now()+timedelta(days=1)):
             self.assertEqual(self.client.post('/api/v1/vouchers/authorize-print/', {'voucher_ids': [vouchers[-1].pk]}, format='json').status_code, 200)

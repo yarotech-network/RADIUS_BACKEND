@@ -80,5 +80,7 @@ class CustomerPurchaseSerializer(serializers.Serializer):
         return terms.get('name') or (obj.plan.name if obj.plan and obj.plan.tenant_id == obj.tenant_id else '')
 
     def get_fulfilled(self, obj):
+        if hasattr(obj, 'iot_purchase'):
+            return bool(obj.status == 'success' and obj.verified_at and obj.iot_purchase.fulfilled_at and obj.iot_purchase.tenant_id == obj.tenant_id)
         return bool(obj.status == 'success' and obj.verified_at and obj.voucher_id
             and obj.voucher.tenant_id == obj.tenant_id and obj.voucher.customer_id == obj.customer_id)

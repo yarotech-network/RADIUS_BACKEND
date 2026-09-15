@@ -13,7 +13,7 @@ class CodeFormatMigrationTests(TransactionTestCase):
     def test_conflicting_legacy_codes_are_reported_without_renaming(self):
         executor = MigrationExecutor(connection)
         before = [('vouchers', '0006_voucher_lifecycle_preservation')]
-        after = [('vouchers', '0007_voucher_code_formats')]
+        latest = executor.loader.graph.leaf_nodes()
         executor.migrate(before)
         old_apps = executor.loader.project_state(before).apps
         Tenant = old_apps.get_model('tenants', 'Tenant')
@@ -40,4 +40,4 @@ class CodeFormatMigrationTests(TransactionTestCase):
         finally:
             if duplicate_id:
                 Voucher.objects.filter(pk=duplicate_id).delete()
-            MigrationExecutor(connection).migrate(after)
+            MigrationExecutor(connection).migrate(latest)

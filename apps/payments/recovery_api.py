@@ -8,19 +8,22 @@ from apps.core.api import tenant_for, audit
 from apps.core.commands import idempotent
 from apps.vouchers.models import PaymentTransaction
 from .models import PaymentDelivery
-from .services import get_paystack_service
+from .services import get_payment_paystack_service
 from .recovery import fulfill_verified_voucher
 from drf_spectacular.utils import extend_schema
 
 
 class RecoverySerializer(serializers.ModelSerializer):
+    purchase_kind = serializers.SerializerMethodField()
     fulfillment_status = serializers.SerializerMethodField()
     delivery_status = serializers.SerializerMethodField()
     class Meta:
         model = PaymentTransaction
-        fields = ["id", "reference", "amount", "status", "verified_at", "voucher", "fulfillment_status", "delivery_status"]
+        fields = ["id", "reference", "amount", "status", "verified_at", "voucher", "fulfillment_status", "delivery_status", "purchase_kind"]
+    def get_purchase_kind(self, obj) -> str:
+        return 'iot' if hasattr(obj, 'iot_purchase') else 'voucher'
     def get_fulfillment_status(self, obj) -> str:
-        return "fulfilled" if obj.voucher_id else ("paid_unfulfilled" if obj.verified_at else "unverified")
+        return "fulfilled" if obj.voucher_id or (hasattr(obj, "iot_purchase") and obj.iot_purchase.fulfilled_at) else ("paid_unfulfilled" if obj.verified_at else "unverified")
     def get_delivery_status(self, obj) -> str:
         if hasattr(obj, "latest_delivery_status"):
             return obj.latest_delivery_status or "not_requested"
@@ -47,7 +50,7 @@ class PaymentRecoveryViewSet(viewsets.ReadOnlyModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return PaymentTransaction.objects.none()
         latest = PaymentDelivery.objects.filter(payment_id=OuterRef("pk")).order_by("-created_at", "id").values("status")[:1]
-        return PaymentTransaction.objects.filter(tenant=tenant_for(self.request)).annotate(latest_delivery_status=Subquery(latest)).order_by("-created_at", "id")
+        return PaymentTransaction.objects.filter(tenant=tenant_for(self.request)).select_related('iot_purchase').annotate(latest_delivery_status=Subquery(latest)).order_by("-created_at", "id")
 
     @extend_schema(request=None, responses=RecoverySerializer)
     @action(detail=True, methods=["post"])
@@ -55,7 +58,7 @@ class PaymentRecoveryViewSet(viewsets.ReadOnlyModelViewSet):
     def retry(self, request, pk=None):
         payment = self.get_object()
         try:
-            verified = get_paystack_service(payment.tenant).verify_transaction(payment.reference)["data"]
+            verified = get_payment_paystack_service(payment).verify_transaction(payment.reference)["data"]
         except Exception:
             return Response({"error": "Payment verification unavailable."}, status=503)
         try:

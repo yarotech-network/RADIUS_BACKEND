@@ -1,0 +1,53 @@
+# Candidate for a separate FreeRADIUS 3.2 instance, NEVER the live sites-enabled.
+# Replace loopback listen/client addresses only after choosing an isolated physical lab NAS.
+server yarotech_staging {
+    listen {
+        type = auth
+        ipaddr = 127.0.0.1
+        port = 18120
+    }
+    listen {
+        type = acct
+        ipaddr = 127.0.0.1
+        port = 18130
+    }
+    authorize {
+        chap
+        update control {
+            REST-HTTP-Header := "X-Radius-Token: REPLACE_PRIVATE_STAGING_TOKEN"
+        }
+        yarotech_rest
+        if (!(ok || updated)) {
+            reject
+        }
+        pap
+    }
+    authenticate {
+        Auth-Type PAP { pap }
+        Auth-Type CHAP { chap }
+    }
+    preacct {
+        acct_unique
+    }
+    accounting {
+        staging_sql
+        if (!(ok || updated)) {
+            fail
+        }
+    }
+    session {
+        staging_sql
+    }
+    post-auth {
+        update control {
+            REST-HTTP-Header := "X-Radius-Token: REPLACE_PRIVATE_STAGING_TOKEN"
+        }
+        yarotech_rest
+        if (!(ok || updated)) {
+            reject
+        }
+        Post-Auth-Type REJECT {
+            noop
+        }
+    }
+}

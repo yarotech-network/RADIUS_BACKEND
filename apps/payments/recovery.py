@@ -22,6 +22,9 @@ def queue_credential_delivery(payment):
 
 
 def fulfill_verified_voucher(payment, verified):
+    if hasattr(payment, 'iot_purchase'):
+        from apps.iot_devices.purchases import fulfill_purchase
+        return fulfill_purchase(payment, verified)
     if (not isinstance(verified, dict) or verified.get("status") != "success" or verified.get("reference") != payment.reference
             or type(verified.get("amount")) is not int or verified.get("amount") != payment.amount or verified.get("currency") != "NGN"):
         raise ValueError("Payment verification mismatch.")
@@ -65,7 +68,7 @@ def verify_voucher_payment(payment):
     """Verify with the saved tenant account, then issue at most one voucher."""
     from .services import get_payment_paystack_service
     payment.refresh_from_db()
-    if payment.status == "success" and payment.voucher_id:
+    if payment.status == "success" and (payment.voucher_id or (hasattr(payment, "iot_purchase") and payment.iot_purchase.fulfilled_at)):
         return payment
     try:
         result = get_payment_paystack_service(payment).verify_transaction(payment.reference)

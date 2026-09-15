@@ -123,6 +123,6 @@ class CustomerViewSet(AuditedCrudMixin, mixins.CreateModelMixin, mixins.UpdateMo
     def purchases(self, request, pk=None):
         from apps.vouchers.models import PaymentTransaction
         customer = self.get_object()
-        rows = PaymentTransaction.objects.filter(customer=customer, tenant=customer.tenant).select_related('plan', 'voucher').order_by('-created_at', '-pk')
+        rows = PaymentTransaction.objects.filter(customer=customer, tenant=customer.tenant).select_related('plan', 'voucher', 'iot_purchase').order_by('-created_at', '-pk')
         page = self.paginate_queryset(rows)
         return self.get_paginated_response(CustomerPurchaseSerializer(page, many=True).data)

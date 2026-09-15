@@ -1,3 +1,5 @@
+> Current coordinated release work: [module 20 plan](20-system-staging-plan.md), [VPS staging commands](../deploy/staging/README.md), and [release evidence](20-release-evidence.md). Earlier inventory results below are historical, not a current readiness verdict. The reference source for this release is `yarotech-radius-system-current`.
+
 # Legacy replacement compatibility review
 
 ## Current status after source recovery

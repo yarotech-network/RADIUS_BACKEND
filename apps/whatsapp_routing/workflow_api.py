@@ -99,7 +99,7 @@ class OrderRecoveryAction(APIView):
         hint = get_object_or_404(WhatsAppOrder, pk=pk, tenant=tenant)
         with transaction.atomic():
             endpoint = SharedWhatsAppEndpoint.objects.select_for_update().get(pk=hint.endpoint_id)
-            order = WhatsAppOrder.objects.select_for_update().select_related('payment__voucher', 'tenant').get(pk=hint.pk)
+            order = WhatsAppOrder.objects.select_for_update(of=('self',)).select_related('payment__voucher', 'tenant').get(pk=hint.pk)
             if order.claim:
                 raise ValidationError('A worker is checking this order. Retry after it finishes.')
             if values['action'] == 'recheck':

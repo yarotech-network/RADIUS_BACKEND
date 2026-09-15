@@ -22,7 +22,8 @@ class MacDeviceSerializer(serializers.ModelSerializer):
     network_enforcement = serializers.SerializerMethodField()
 
     def get_network_enforcement(self, obj) -> str:
-        return 'not_connected'
+        from django.conf import settings
+        return 'rest_configured' if getattr(settings, 'RADIUS_REST_ENABLED', False) else 'not_connected'
 
 
     def get_accounting(self, obj) -> dict:

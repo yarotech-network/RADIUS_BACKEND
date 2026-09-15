@@ -69,6 +69,7 @@ class MacDevice(models.Model):
 
 
 class DeviceRenewal(models.Model):
+    payment = models.OneToOneField('vouchers.PaymentTransaction', null=True, blank=True, on_delete=models.PROTECT, related_name='device_grant')
     device = models.ForeignKey(MacDevice, on_delete=models.PROTECT, related_name='renewals')
     tenant = models.ForeignKey('tenants.Tenant', on_delete=models.PROTECT)
     actor = models.ForeignKey('accounts.User', null=True, on_delete=models.SET_NULL)
@@ -79,3 +80,24 @@ class DeviceRenewal(models.Model):
 
     class Meta:
         ordering = ['-created_at', '-pk']
+
+
+class PublicIoTPurchase(models.Model):
+    payment = models.OneToOneField('vouchers.PaymentTransaction', on_delete=models.PROTECT, related_name='iot_purchase')
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.PROTECT)
+    router = models.ForeignKey('routers.NASDevice', on_delete=models.PROTECT)
+    device = models.ForeignKey(MacDevice, null=True, blank=True, on_delete=models.PROTECT, related_name='purchases')
+    device_name = models.CharField(max_length=200)
+    mac_address = models.CharField(max_length=17)
+    expected_version = models.PositiveIntegerField(null=True, blank=True)
+    payment_secret_encrypted = models.TextField(editable=False)
+    fulfilled_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [
+            models.UniqueConstraint(fields=['mac_address'], condition=models.Q(expected_version__isnull=True), name='iot_first_purchase_mac_unique'),
+            models.UniqueConstraint(fields=['device', 'expected_version'], condition=models.Q(expected_version__isnull=False), name='iot_renewal_version_unique'),
+        ]

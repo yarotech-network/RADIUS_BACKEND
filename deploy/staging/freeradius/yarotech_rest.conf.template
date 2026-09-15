@@ -1,0 +1,31 @@
+# Install only in the isolated staging instance mods-enabled directory.
+# Replace the token privately with RADIUS_REST_TOKEN from backend.env.
+rest yarotech_rest {
+    connect_uri = "http://127.0.0.1:8020"
+    connect_timeout = 3.0
+    authorize {
+        uri = "${..connect_uri}/api/v1/radius/hotspot/authorize/"
+        method = 'post'
+        body = 'post'
+        data = "username=%{urlencode:%{User-Name}}&packet_src_ip=%{urlencode:%{Packet-Src-IP-Address}}&calling_station_id=%{urlencode:%{Calling-Station-Id}}"
+        force_to = 'json'
+        timeout = 5.0
+    }
+    post-auth {
+        uri = "${..connect_uri}/api/v1/radius/hotspot/post-auth/"
+        method = 'post'
+        body = 'post'
+        data = "username=%{urlencode:%{User-Name}}&packet_src_ip=%{urlencode:%{Packet-Src-IP-Address}}&calling_station_id=%{urlencode:%{Calling-Station-Id}}&session_timeout=%{%{reply:Session-Timeout}:-300}"
+        force_to = 'json'
+        timeout = 5.0
+    }
+    pool {
+        start = 0
+        min = 0
+        max = 8
+        spare = 1
+        uses = 0
+        lifetime = 0
+        idle_timeout = 60
+    }
+}

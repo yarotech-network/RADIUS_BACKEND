@@ -266,7 +266,7 @@ class Radreply(models.Model):
 class Radacct(models.Model):
     callingstationid = models.CharField(max_length=64, null=True, blank=True)
     radacctid = models.BigAutoField(primary_key=True)
-    sessionid = models.CharField(max_length=64)
+    sessionid = models.CharField(max_length=64, db_column='acctsessionid')
     username = models.CharField(max_length=64)
     nasipaddress = models.GenericIPAddressField()
     nasportid = models.CharField(max_length=32, null=True)
@@ -284,7 +284,7 @@ class Radacct(models.Model):
 
 class Radpostauth(models.Model):
     username = models.CharField(max_length=64)
-    pass_reply = models.CharField(max_length=64)
+    pass_reply = models.CharField(max_length=64, db_column='reply')
     authdate = models.DateTimeField()
 
     class Meta:

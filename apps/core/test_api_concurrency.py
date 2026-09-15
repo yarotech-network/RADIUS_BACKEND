@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from apps.core.commands import idempotent
 from apps.core.models import AuditEvent, ApiCommand
 from apps.tenants.models import Tenant, TenantMembership
-from apps.vouchers.models import InternetPlan, Voucher, PaymentTransaction, Radcheck
+from apps.vouchers.models import InternetPlan, Voucher, PaymentTransaction, Radcheck, Radreply
 from apps.payments.recovery import fulfill_verified_voucher
 from apps.agents.models import AgentProfile, AgentWallet, AgentWalletFundingPayment
 from apps.agents.services import AgentService
@@ -23,18 +23,22 @@ class ConcurrentApiTests(TransactionTestCase):
     def setUp(self):
         self.assertEqual(connection.vendor, "postgresql")
         self.assertIn("test", connection.settings_dict["NAME"])
-        self.created_radius_table = Radcheck._meta.db_table not in connection.introspection.table_names()
-        if self.created_radius_table:
-            with connection.schema_editor() as editor:
-                editor.create_model(Radcheck)
+        self.created_radius_tables = []
+        for model in (Radcheck, Radreply):
+            if model._meta.db_table not in connection.introspection.table_names():
+                with connection.schema_editor() as editor:
+                    editor.create_model(model)
+                self.created_radius_tables.append(model)
         self.user = get_user_model().objects.create_user("concurrent", "concurrent@example.com", "Strong-Password-2819")
         self.tenant = Tenant.objects.create(name="Concurrent", slug="concurrent")
+        from apps.subscriptions.test_support import grant_test_subscription
+        grant_test_subscription(self.tenant)
         self.plan = InternetPlan.objects.create(tenant=self.tenant, name="Day", price=5000, duration_hours=24, rate_limit="1M/1M")
 
     def tearDown(self):
-        if self.created_radius_table:
+        for model in reversed(self.created_radius_tables):
             with connection.schema_editor() as editor:
-                editor.delete_model(Radcheck)
+                editor.delete_model(model)
 
     def parallel(self, function):
         barrier = Barrier(2)

@@ -135,6 +135,10 @@ class PaystackService:
     BASE_URL = "https://api.paystack.co"
 
     def __init__(self, secret_key):
+        from django.conf import settings
+        if getattr(settings, 'STAGING_MODE', False) and secret_key and not secret_key.startswith('sk_test_'):
+            from django.core.exceptions import ImproperlyConfigured
+            raise ImproperlyConfigured('Staging refuses live payment credentials, including imported tenant keys.')
         self.secret_key = secret_key
         self.headers = {
             "Authorization": f"Bearer {secret_key}",

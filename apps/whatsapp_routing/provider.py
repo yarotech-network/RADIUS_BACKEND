@@ -47,6 +47,11 @@ def verify_endpoint(endpoint):
 
 @sensitive_variables()
 def send_payload(endpoint, payload):
+    if getattr(settings, 'STAGING_MODE', False):
+        allowed = {re.sub(r'\D', '', value) for value in getattr(settings, 'STAGING_WHATSAPP_RECIPIENTS', [])}
+        allowed.discard('')
+        if re.sub(r'\D', '', str(payload.get('to', ''))) not in allowed:
+            raise ProviderFailure('staging_recipient_not_allowed')
     try:
         response = requests.post(api_url(endpoint.phone_number_id, '/messages'), json=payload,
             headers={'Authorization': f'Bearer {secret_store.decrypt(endpoint.access_token_encrypted)}'},

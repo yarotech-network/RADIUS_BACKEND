@@ -78,7 +78,7 @@ class InitializePaymentView(APIView):
 
 
 def mask_email(address):
-    """`customer@example.com` -> `c•••@example.com`; enough for "we emailed it to …" copy."""
+    """`customer@example.com` -> `câ€¢â€¢â€¢@example.com`; enough for "we emailed it to â€¦" copy."""
     if not address or "@" not in address:
         return ""
     local, domain = address.rsplit("@", 1)
@@ -90,7 +90,7 @@ class PaymentCallbackView(APIView):
 
     The public result page polls this with the payment reference. Once the purchase is fulfilled
     the response carries the voucher's single access code (username == password for customer
-    vouchers) — but only while the voucher is still unused. After the customer's first login the
+    vouchers) â€” but only while the voucher is still unused. After the customer's first login the
     reference stops revealing a usable credential, so a leaked or shared reference (browser
     history, Paystack receipt, support chat) cannot be replayed by someone else.
     """
@@ -110,6 +110,9 @@ class PaymentCallbackView(APIView):
         return self.payment_response(transaction)
 
     def payment_response(self, transaction):
+        if hasattr(transaction, 'iot_purchase'):
+            from apps.iot_devices.purchases import purchase_response
+            return Response(purchase_response(transaction), headers={'Cache-Control': 'no-store'})
         reference = transaction.reference
         voucher = transaction.voucher
         fulfilled = transaction.status == "success" and voucher is not None
@@ -159,3 +162,51 @@ class VerifyPaymentView(PaymentCallbackView):
         except VoucherVerificationMismatch:
             return Response({"detail": "Payment details could not be matched. Contact the business before paying again."}, status=409)
         return self.payment_response(payment)
+
+
+class InitializeIoTPaymentView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    from rest_framework.throttling import ScopedRateThrottle
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'storefront_verify'
+
+    @idempotent
+    def post(self, request):
+        from rest_framework import serializers
+        from apps.iot_devices.purchases import reserve_purchase
+        from .services import get_payment_paystack_service
+        class Input(serializers.Serializer):
+            plan_id = serializers.PrimaryKeyRelatedField(source='plan', queryset=InternetPlan.objects.filter(plan_type='iot_mac'))
+            email = serializers.EmailField()
+            name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+            phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+            device_name = serializers.CharField(max_length=200)
+            mac_address = serializers.CharField(max_length=32)
+            renewal_token = serializers.CharField(max_length=1024, required=False, allow_blank=True)
+        if not request.headers.get('Idempotency-Key'):
+            raise ValidationError('An Idempotency-Key is required.')
+        serializer = Input(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if set(request.data) - set(serializer.fields):
+            raise ValidationError('Unknown purchase fields.')
+        payment = reserve_purchase(serializer.validated_data)
+        try:
+            result = get_payment_paystack_service(payment).initialize_transaction(email=payment.customer_email,
+                amount=payment.amount, reference=payment.reference, callback_url=payment_callback_url('voucher'),
+                metadata={'purchase_type': 'iot'})
+            if not isinstance(result, dict) or result.get('status') is not True:
+                raise ValueError('Payment initialization rejected')
+            data = result.get('data') or {}
+            if data.get('reference') != payment.reference:
+                raise ValueError('Payment reference mismatch')
+            url = data['authorization_url']
+            from urllib.parse import urlsplit
+            parsed = urlsplit(url)
+            if (parsed.scheme != 'https' or parsed.hostname != 'checkout.paystack.com' or parsed.username or parsed.password
+                or parsed.port not in (None, 443) or '\\' in url):
+                raise ValueError('Invalid checkout URL')
+        except Exception:
+            return Response({'detail': 'Payment initialization needs checking. Keep this reference; do not start another payment if charged.',
+                'reference': payment.reference, 'amount': payment.amount}, status=503)
+        return Response({'authorization_url': url, 'reference': payment.reference, 'amount': payment.amount})

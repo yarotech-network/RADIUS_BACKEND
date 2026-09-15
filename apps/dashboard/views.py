@@ -46,7 +46,7 @@ class DashboardStatsView(APIView):
             "amount_unit": "kobo",
             "observed_at": timezone.now(),
             "pending_payments": PaymentTransaction.objects.filter(tenant=tenant, status="pending").count(),
-            "paid_unfulfilled_payments": PaymentTransaction.objects.filter(tenant=tenant, verified_at__isnull=False, voucher__isnull=True).count(),
+            "paid_unfulfilled_payments": PaymentTransaction.objects.filter(tenant=tenant, verified_at__isnull=False, voucher__isnull=True).filter(iot_purchase__fulfilled_at__isnull=True).count(),
         })
 
 

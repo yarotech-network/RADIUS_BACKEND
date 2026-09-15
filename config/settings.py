@@ -257,3 +257,9 @@ ROUTER_LOCAL_LAN_WIFI_EXTENSIONS = config("ROUTER_LOCAL_LAN_WIFI_EXTENSIONS", de
 
 # New storefront and batch device selection; enable after RADIUS capacity rehearsal.
 MULTI_DEVICE_VOUCHERS_ENABLED = config("MULTI_DEVICE_VOUCHERS_ENABLED", default=False, cast=bool)
+
+
+# Explicitly enabled only after isolated FreeRADIUS acceptance.
+RADIUS_REST_ENABLED = config('RADIUS_REST_ENABLED', default=False, cast=bool)
+RADIUS_REST_TOKEN = config('RADIUS_REST_TOKEN', default='')
+IOT_PUBLIC_PURCHASE_ENABLED = config('IOT_PUBLIC_PURCHASE_ENABLED', default=False, cast=bool)

@@ -16,7 +16,7 @@ def _claim(outbound_id):
     with transaction.atomic():
         hint = WhatsAppOutbound.objects.get(pk=outbound_id)
         endpoint = SharedWhatsAppEndpoint.objects.select_for_update().get(pk=hint.endpoint_id)
-        row = WhatsAppOutbound.objects.select_for_update().select_related('order__payment__voucher', 'tenant', 'source_event').get(pk=outbound_id)
+        row = WhatsAppOutbound.objects.select_for_update(of=('self',)).select_related('order__payment__voucher', 'tenant', 'source_event').get(pk=outbound_id)
         now = timezone.now()
         if row.state == 'sending' and row.started_at < now-timedelta(minutes=5):
             row.state, row.error_code = 'unknown', 'delivery_outcome_unknown'

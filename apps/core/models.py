@@ -29,3 +29,21 @@ class AuditEvent(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+
+
+class LegacyImportRun(models.Model):
+    source_digest = models.CharField(max_length=64, unique=True)
+    plan_digest = models.CharField(max_length=64)
+    completed_at = models.DateTimeField(null=True)
+    summary = models.JSONField(default=dict)
+
+
+class LegacyRecord(models.Model):
+    run = models.ForeignKey(LegacyImportRun, on_delete=models.PROTECT, related_name='records')
+    source_key = models.CharField(max_length=200)
+    source_digest = models.CharField(max_length=64)
+    payload_encrypted = models.TextField(editable=False)
+    targets = models.JSONField(default=list)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['run', 'source_key'], name='legacy_import_source_unique')]

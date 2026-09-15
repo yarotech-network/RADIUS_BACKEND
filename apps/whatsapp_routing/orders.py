@@ -98,7 +98,7 @@ def process_order(order_id):
         error = 'initialization_outcome_unknown' if initialize else 'verification_or_fulfilment_pending'
     with transaction.atomic():
         endpoint = SharedWhatsAppEndpoint.objects.select_for_update().get(pk=order.endpoint_id)
-        locked = WhatsAppOrder.objects.select_for_update().select_related('payment__voucher', 'tenant').get(pk=order.pk)
+        locked = WhatsAppOrder.objects.select_for_update(of=('self',)).select_related('payment__voucher', 'tenant').get(pk=order.pk)
         if locked.claim != order.claim:
             return True
         locked.claim = None

@@ -81,7 +81,7 @@ def paystack_webhook(request, token):
 
     tenant = _tenant_for(kind, payment)
     whatsapp_service = None
-    if kind == 'voucher' and getattr(payment, 'whatsapp_order', None):
+    if kind == 'voucher' and (getattr(payment, 'iot_purchase', None) or getattr(payment, 'whatsapp_order', None)):
         from .services import get_payment_paystack_service
         whatsapp_service = get_payment_paystack_service(payment)
     signature = request.headers.get("x-paystack-signature", "")

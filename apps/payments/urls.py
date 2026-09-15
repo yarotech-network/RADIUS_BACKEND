@@ -3,6 +3,7 @@ from . import views
 from .webhooks import paystack_webhook
 
 urlpatterns = [
+    path("buy/iot/", views.InitializeIoTPaymentView.as_view(), name="buy-iot"),
     path("payments/verify/", views.VerifyPaymentView.as_view(), name="payment-verify"),
     path("buy/", views.InitializePaymentView.as_view(), name="buy-voucher"),
     path("payments/callback/", views.PaymentCallbackView.as_view(), name="payment-callback"),
