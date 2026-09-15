@@ -1,6 +1,9 @@
 from rest_framework import serializers
-import re
+from copy import copy
+from django.core.exceptions import ValidationError as DjangoValidationError
+from .lifecycle import check_version, validate_grant, apply_plan_snapshot
 from .models import MacDevice
+from apps.vouchers.models import InternetPlan
 from apps.core.api import tenant_for
 
 
@@ -14,6 +17,13 @@ class DeviceAccountingSerializer(serializers.Serializer):
 
 class MacDeviceSerializer(serializers.ModelSerializer):
     accounting = serializers.SerializerMethodField()
+    status = serializers.CharField(source='effective_status', read_only=True)
+    expected_version = serializers.IntegerField(min_value=1, required=False, write_only=True)
+    network_enforcement = serializers.SerializerMethodField()
+
+    def get_network_enforcement(self, obj) -> str:
+        return 'not_connected'
+
 
     def get_accounting(self, obj) -> dict:
         data = self.context.get("device_accounting", {}).get(obj.pk)
@@ -23,26 +33,26 @@ class MacDeviceSerializer(serializers.ModelSerializer):
     router_location = serializers.CharField(source="router.location", read_only=True, default=None)
     vlan_id = serializers.IntegerField(min_value=1, max_value=4094, allow_null=True, required=False)
     description = serializers.CharField(max_length=2000, allow_blank=True, required=False)
-    plan_name = serializers.CharField(source="plan.name", read_only=True)
+    plan_name = serializers.CharField(source="plan.name", read_only=True, default=None)
 
     class Meta:
         model = MacDevice
         fields = [
-            "id", "mac_address", "device_name", "plan", "plan_name",
+            "id", "status", "version", "expected_version", "deleted_at", "speed_limit", "data_limit_bytes", "network_enforcement", "mac_address", "device_name", "plan", "plan_name",
             "tenant", "is_active", "expires_at", "created_at",
             "router", "router_name", "router_location", "access_type", "vlan_id", "description", "accounting",
         ]
-        read_only_fields = ["id", "tenant", "created_at"]
+        read_only_fields = ["id", "tenant", "created_at", "version", "deleted_at", "speed_limit", "data_limit_bytes"]
 
     def validate_mac_address(self, value):
-        compact = value.replace(":", "").replace("-", "").replace(".", "")
-        if not re.fullmatch(r"[0-9A-Fa-f]{12}", compact):
-            raise serializers.ValidationError("Enter a valid 12-digit MAC address.")
-        return MacDevice.normalize_mac(compact)
+        try:
+            return MacDevice.normalize_mac(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
 
     def validate_plan(self, value):
         request = self.context.get("request")
-        if request and value.tenant_id != tenant_for(request).pk:
+        if request and value and value.tenant_id != tenant_for(request).pk:
             raise serializers.ValidationError("Plan does not belong to your tenant.")
         return value
 
@@ -52,20 +62,67 @@ class MacDeviceSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        access_type = attrs.get("access_type", getattr(self.instance, "access_type", "timed"))
-        expiry = attrs.get("expires_at", getattr(self.instance, "expires_at", None))
-        if access_type == "timed" and expiry is None:
-            raise serializers.ValidationError({"expires_at": "An expiry is required for time-limited access."})
-        if access_type == "permanent":
-            attrs["expires_at"] = None
-        # Older records can remain unassigned; the new router-bound workflow must select a router.
-        if "access_type" in attrs and not attrs.get("router", getattr(self.instance, "router", None)):
-            raise serializers.ValidationError({"router": "Choose a router for this device."})
-        plan = attrs.get('plan', getattr(self.instance, 'plan', None))
-        router = attrs.get('router', getattr(self.instance, 'router', None))
-        assigning = self.instance is None or ('plan' in attrs and attrs['plan'].pk != self.instance.plan_id)
-        if assigning and plan and (not plan.is_active or plan.archived_at):
-            raise serializers.ValidationError({'plan': 'Choose an active, unarchived plan.'})
-        if plan and plan.public_router_id and (not router or router.pk != plan.public_router_id):
-            raise serializers.ValidationError({'router': 'This plan is restricted to its configured router.'})
+        allowed = {name for name, field in self.fields.items() if not field.read_only}
+        if set(self.initial_data) - allowed:
+            raise serializers.ValidationError('Unknown or read-only device fields are not accepted.')
+        if self.instance:
+            check_version(self.instance, attrs.pop('expected_version', None))
+            if self.instance.configured_status == 'deleted':
+                raise serializers.ValidationError('Deleted registrations cannot be edited.')
+            if self.instance.configured_status == 'revoked' and 'is_active' in attrs:
+                raise serializers.ValidationError('Use the explicit reactivation action for a revoked registration.')
+        else:
+            attrs.pop('expected_version', None)
+        candidate = copy(self.instance) if self.instance else MacDevice(tenant=tenant_for(self.context['request']))
+        for key, value in attrs.items():
+            setattr(candidate, key, value)
+        if candidate.access_type == 'permanent':
+            attrs['expires_at'] = candidate.expires_at = None
+        if candidate.access_type == 'timed' and not candidate.expires_at:
+            raise serializers.ValidationError({'expires_at':'An expiry is required for time-limited access.'})
+        granting = self.instance is None or any(key in attrs and attrs[key] != getattr(self.instance, key)
+            for key in ('plan', 'router', 'expires_at', 'access_type', 'mac_address')) or attrs.get('is_active') is True
+        if granting:
+            validate_grant(candidate)
+            if 'plan' in attrs:
+                attrs['plan'] = candidate.plan
+            if 'router' in attrs:
+                attrs['router'] = candidate.router
         return attrs
+
+    def create(self, validated_data):
+        device = MacDevice(**validated_data)
+        device.status = 'active' if device.is_active else 'suspended'
+        apply_plan_snapshot(device)
+        device.save()
+        return device
+
+    def update(self, instance, validated_data):
+        changed_plan = 'plan' in validated_data and validated_data['plan'] != instance.plan
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        if 'is_active' in validated_data:
+            instance.status = 'active' if validated_data['is_active'] else 'suspended'
+        if changed_plan:
+            apply_plan_snapshot(instance)
+        instance.version += 1
+        instance.save()
+        return instance
+
+
+class DeviceActionSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=['suspend','reactivate','revoke','delete'])
+    expected_version = serializers.IntegerField(min_value=1)
+
+
+class RenewalRequestSerializer(serializers.Serializer):
+    plan = serializers.PrimaryKeyRelatedField(queryset=InternetPlan.objects.all())
+    expected_version = serializers.IntegerField(min_value=1)
+
+
+class RenewalSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    previous_expiry = serializers.DateTimeField(allow_null=True)
+    expires_at = serializers.DateTimeField()
+    terms = serializers.JSONField()
+    created_at = serializers.DateTimeField()

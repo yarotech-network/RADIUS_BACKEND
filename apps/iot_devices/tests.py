@@ -27,7 +27,7 @@ class IoTDeviceTests(APITestCase):
         new_expiry = expiry + timedelta(days=1)
         detail = reverse("iot-device-detail", args=[device.pk])
         edited = self.client.patch(detail, {
-            "mac_address": "AA:BB:CC:DD:EE:11", "device_name": "Edited camera",
+            "expected_version": device.version, "mac_address": "AA:BB:CC:DD:EE:11", "device_name": "Edited camera",
             "plan": self.plan_a.pk, "expires_at": new_expiry.isoformat(), "is_active": True,
         }, format="json")
         self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
@@ -44,15 +44,17 @@ class IoTDeviceTests(APITestCase):
     def setUp(self):
         self.a = Tenant.objects.create(name="A", slug="a")
         self.b = Tenant.objects.create(name="B", slug="b")
-        self.plan_a = InternetPlan.objects.create(tenant=self.a, name="A", price=1000, duration_hours=24, rate_limit="1M/1M")
-        self.plan_b = InternetPlan.objects.create(tenant=self.b, name="B", price=1000, duration_hours=24, rate_limit="1M/1M")
+        self.plan_a = InternetPlan.objects.create(tenant=self.a, name="A", price=1000, duration_hours=24, rate_limit="1M/1M", plan_type="iot_mac")
+        self.plan_b = InternetPlan.objects.create(tenant=self.b, name="B", price=1000, duration_hours=24, rate_limit="1M/1M", plan_type="iot_mac")
+        from apps.routers.models import NASDevice
+        self.router = NASDevice.objects.create(tenant=self.a, name="Assigned", ip_address="192.0.2.40")
         self.manager = User.objects.create_user(username="manager", email="manager@example.com", password="StrongPass-4821")
         self.staff = User.objects.create_user(username="staff", email="staff@example.com", password="StrongPass-4821")
         TenantMembership.objects.create(user=self.manager, tenant=self.a, role="manager")
         TenantMembership.objects.create(user=self.staff, tenant=self.a, role="staff")
 
     def payload(self, **overrides):
-        data = {"mac_address": "aabbccddeeff", "device_name": "Camera", "plan": self.plan_a.id, "expires_at": timezone.now() + timedelta(days=1)}
+        data = {"router": str(self.router.pk), "access_type": "timed", "mac_address": "aabbccddeeff", "device_name": "Camera", "plan": self.plan_a.id, "expires_at": timezone.now() + timedelta(days=1)}
         data.update(overrides)
         return data
 
@@ -95,7 +97,7 @@ class IoTDeviceTests(APITestCase):
         self.assertEqual(response.data["vlan_id"], 42)
         detail = reverse("iot-device-detail", args=[response.data["id"]])
         for payload in [{"router": str(other.pk)}, {"vlan_id": 4095}, {"access_type": "timed", "expires_at": None}]:
-            rejected = self.client.patch(detail, payload, format="json")
+            rejected = self.client.patch(detail, {**payload, "expected_version": 1}, format="json")
             self.assertEqual(rejected.status_code, 400, rejected.data)
         device = MacDevice.objects.get(pk=response.data["id"])
         self.assertEqual(device.router_id, own.pk)
