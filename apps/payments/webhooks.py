@@ -80,14 +80,18 @@ def paystack_webhook(request, token):
         return JsonResponse({"status": "ignored"}, status=200)
 
     tenant = _tenant_for(kind, payment)
+    whatsapp_service = None
+    if kind == 'voucher' and getattr(payment, 'whatsapp_order', None):
+        from .services import get_payment_paystack_service
+        whatsapp_service = get_payment_paystack_service(payment)
     signature = request.headers.get("x-paystack-signature", "")
-    if not _valid_signature(request.body, signature, get_paystack_secret(tenant)):
+    if not _valid_signature(request.body, signature, whatsapp_service.secret_key if whatsapp_service else get_paystack_secret(tenant)):
         return JsonResponse({"error": "Invalid signature"}, status=400)
     if event != "charge.success":
         return JsonResponse({"status": "ignored"}, status=200)
 
     try:
-        verified = get_paystack_service(tenant).verify_transaction(reference)["data"]
+        verified = (whatsapp_service or get_paystack_service(tenant)).verify_transaction(reference)["data"]
     except Exception:
         return JsonResponse({"error": "Payment verification unavailable"}, status=503)
 

@@ -12,7 +12,7 @@ EnvironmentFile=/etc/yarotech-radius/backend.env
 Environment=DJANGO_SETTINGS_MODULE=config.production_settings
 RuntimeDirectory=yarotech-radius
 RuntimeDirectoryMode=0750
-ExecStart=/opt/yarotech-radius/backend/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --threads 2 --timeout 30 --graceful-timeout 30 --access-logfile - --error-logfile -
+ExecStart=/opt/yarotech-radius/backend/venv/bin/gunicorn config.wsgi:application --config /opt/yarotech-radius/backend/deploy/ubuntu/gunicorn.conf.py --bind 127.0.0.1:8000 --workers 3 --threads 2 --timeout 30 --graceful-timeout 30 --access-logfile - --error-logfile -
 ExecReload=/bin/kill -s HUP $MAINPID
 KillSignal=SIGQUIT
 TimeoutStopSec=35

@@ -16,6 +16,10 @@ tests and a disposable API probe. The accepted runtime identity fixes are now im
 remains outstanding. Current tracked source availability is resolved; production data
 freshness, PostgreSQL rehearsal and migration safety are not yet verified.
 
+## Current comparison continuation
+
+[Module 18: customers and device history](18-customers-device-history.md) maps anonymous contact preservation, payment/voucher customer links, legacy MAC evidence and the retained PPPoE/device-history features. It records the accepted separate-contact-per-purchase policy, implemented contact/payment/voucher links, unnamed contacts, scoped purchase history and prepared migrations. Local implementation is complete; actual legacy data transfer and target deployment remain unverified.
+
 ## Objective and boundary
 
 [Module 2: plans and subscriptions](02-plans-subscriptions.md) maps customer-plan

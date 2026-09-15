@@ -4,9 +4,13 @@ from .models import Customer
 
 class CustomerSerializer(serializers.ModelSerializer):
     has_service = serializers.BooleanField(read_only=True)
+    display_name = serializers.SerializerMethodField()
+
+    def get_display_name(self, obj):
+        return obj.name or obj.phone or obj.email or obj.reference
     class Meta:
         model = Customer
-        fields = ["id", "has_service", "reference", "name", "email", "phone", "address", "notes", "archived_at", "created_at", "updated_at"]
+        fields = ["id", "has_service", "display_name", "mac_address", "reference", "name", "email", "phone", "address", "notes", "archived_at", "created_at", "updated_at"]
         read_only_fields = ["id", "archived_at", "created_at", "updated_at"]
         validators = []  # Tenant and normalized reference are checked under the tenant write lock.
 
@@ -49,6 +53,7 @@ class PreviewRowSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    mac_address = serializers.CharField(required=False, allow_blank=True)
 
 
 class ImportPreviewSerializer(serializers.Serializer):
@@ -59,3 +64,21 @@ class ImportPreviewSerializer(serializers.Serializer):
 
 class ImportResultSerializer(serializers.Serializer):
     count = serializers.IntegerField()
+
+
+class CustomerPurchaseSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    amount = serializers.IntegerField(help_text='NGN kobo')
+    status = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    paid_at = serializers.DateTimeField(allow_null=True)
+    plan_name = serializers.SerializerMethodField()
+    fulfilled = serializers.SerializerMethodField()
+
+    def get_plan_name(self, obj):
+        terms = obj.purchased_terms if isinstance(obj.purchased_terms, dict) else {}
+        return terms.get('name') or (obj.plan.name if obj.plan and obj.plan.tenant_id == obj.tenant_id else '')
+
+    def get_fulfilled(self, obj):
+        return bool(obj.status == 'success' and obj.verified_at and obj.voucher_id
+            and obj.voucher.tenant_id == obj.tenant_id and obj.voucher.customer_id == obj.customer_id)

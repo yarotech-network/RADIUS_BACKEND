@@ -119,3 +119,11 @@ Keep the previous application artifact available. Application rollback is allowe
 only while its code remains compatible with the migrated schema. Restore drills,
 Fernet rotation, FreeRADIUS's standard PostgreSQL accounting schema, real provider
 tests, and a live router/VPS smoke test remain explicit release gates.
+
+
+## WhatsApp customer workflow
+
+Shared-number conversations, payments, delivery and reminders have a separate default-off worker.
+Follow [the stage-17 activation and rollback runbook](../../compatibility/17-whatsapp-customer-workflow.md)
+before installing `yarotech-radius-whatsapp.service` and `.timer`. Consumer-on/send-off is not a
+financial dry run; use `whatsapp_inbox_status` for read-only diagnostics.

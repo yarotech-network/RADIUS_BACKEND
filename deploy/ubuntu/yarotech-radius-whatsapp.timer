@@ -1,0 +1,11 @@
+[Unit]
+Description=Process Yarotech WhatsApp work after each completed batch
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=10
+AccuracySec=1
+Unit=yarotech-radius-whatsapp.service
+
+[Install]
+WantedBy=timers.target

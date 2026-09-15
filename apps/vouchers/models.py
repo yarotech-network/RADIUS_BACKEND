@@ -98,6 +98,8 @@ class InternetPlan(models.Model):
 
 
 class Voucher(models.Model):
+    customer = models.ForeignKey('customers.Customer', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='vouchers')
     purchased_terms = models.JSONField(null=True, blank=True, editable=False)
     issued_duration_seconds = models.PositiveBigIntegerField(null=True, blank=True, editable=False)
     rate_limit_snapshot = models.CharField(max_length=50, blank=True, default="", db_default="")
@@ -204,6 +206,8 @@ class Voucher(models.Model):
 
 
 class PaymentTransaction(models.Model):
+    customer = models.ForeignKey('customers.Customer', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='purchases')
     purchased_terms = models.JSONField(null=True, blank=True, editable=False)
     verified_at = models.DateTimeField(null=True, blank=True)
     STATUS_CHOICES = [

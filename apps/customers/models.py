@@ -4,8 +4,12 @@ from django.db.models.functions import Lower
 
 class Customer(models.Model):
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.PROTECT, related_name="customers")
+    mac_address = models.CharField(max_length=32, blank=True, default='', db_default='',
+        help_text='Contact evidence only; does not grant network access or identify a person.')
+    legacy_source = models.CharField(max_length=64, blank=True, default='', db_default='', editable=False)
+    legacy_id = models.PositiveBigIntegerField(null=True, blank=True, editable=False)
     reference = models.SlugField(max_length=40)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     address = models.CharField(max_length=500, blank=True)
@@ -16,7 +20,11 @@ class Customer(models.Model):
 
     class Meta:
         ordering = ["name", "id"]
-        constraints = [models.UniqueConstraint(Lower("reference"), "tenant", name="customer_tenant_reference_ci")]
+        constraints = [models.UniqueConstraint(Lower("reference"), "tenant", name="customer_tenant_reference_ci"),
+            models.UniqueConstraint(fields=['tenant', 'legacy_source', 'legacy_id'],
+                condition=models.Q(legacy_id__isnull=False) & ~models.Q(legacy_source=''), name='customer_legacy_identity_unique'),
+            models.CheckConstraint(condition=(models.Q(legacy_source='', legacy_id__isnull=True)
+                | (~models.Q(legacy_source='') & models.Q(legacy_id__isnull=False))), name='customer_legacy_identity_pair')]
         indexes = [models.Index(fields=["tenant", "archived_at", "id"], name="customer_tenant_archive_idx")]
 
 

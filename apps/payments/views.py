@@ -1,3 +1,4 @@
+from apps.customers.purchases import create_purchase_payment
 from apps.payments.callbacks import payment_callback_url
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
@@ -39,7 +40,7 @@ class InitializePaymentView(APIView):
             from apps.subscriptions.access import require_tenant_access
             require_tenant_access(plan.tenant)
             terms = snapshot_plan(plan, device_limit)
-            transaction = PaymentTransaction.objects.create(
+            transaction = create_purchase_payment(
                 reference=reference, amount=terms["price"], customer_email=email,
                 customer_name=name, customer_phone=phone, plan=plan, tenant=plan.tenant,
                 purchased_terms=terms,

@@ -30,6 +30,11 @@ def fulfill_verified_voucher(payment, verified):
     PaymentTransaction.objects.filter(pk=payment.pk).update(verified_at=timezone.now())
     with transaction.atomic():
         locked = PaymentTransaction.objects.select_for_update().get(pk=payment.pk)
+        if locked.customer_id and locked.customer.tenant_id != locked.tenant_id:
+            raise ValueError('Payment customer belongs to another tenant.')
+        if locked.voucher_id and (locked.voucher.tenant_id != locked.tenant_id
+            or locked.voucher.customer_id != locked.customer_id):
+            raise ValueError('Payment and voucher customer links require reconciliation.')
         if not locked.voucher_id:
             if locked.plan_id is None:
                 raise ValueError("Payment plan is unavailable.")
@@ -39,6 +44,8 @@ def fulfill_verified_voucher(payment, verified):
             if locked.purchased_terms is not None and locked.purchased_terms.get('price') != locked.amount:
                 raise ValueError('Purchased amount mismatch.')
             locked.voucher = VoucherService.generate_vouchers(tenant=locked.tenant, plan_id=locked.plan_id, quantity=1, source="customer", purchased_terms=locked.purchased_terms)[0]
+            locked.voucher.customer_id = locked.customer_id
+            locked.voucher.save(update_fields=['customer'])
         locked.status = "success"
         locked.paid_at = locked.paid_at or timezone.now()
         locked.save(update_fields=["voucher", "status", "paid_at"])
@@ -56,12 +63,12 @@ class VoucherVerificationMismatch(Exception):
 
 def verify_voucher_payment(payment):
     """Verify with the saved tenant account, then issue at most one voucher."""
-    from .services import get_paystack_service
+    from .services import get_payment_paystack_service
     payment.refresh_from_db()
     if payment.status == "success" and payment.voucher_id:
         return payment
     try:
-        result = get_paystack_service(payment.tenant).verify_transaction(payment.reference)
+        result = get_payment_paystack_service(payment).verify_transaction(payment.reference)
     except Exception as exc:
         raise VoucherVerificationUnavailable() from exc
     if not isinstance(result, dict) or result.get("status") is not True or not isinstance(result.get("data"), dict):

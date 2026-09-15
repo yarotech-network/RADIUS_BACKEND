@@ -13,3 +13,8 @@ class InitializePaymentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if {'customer', 'customer_id'} & set(self.initial_data):
+            raise serializers.ValidationError('Customer records are assigned by the server.')
+        return attrs

@@ -12,7 +12,7 @@ from apps.core.mixins import AuditedCrudMixin
 from apps.core.permissions import IsTenantManager
 from apps.tenants.models import Tenant
 from .models import Customer
-from .serializers import CustomerSerializer, ImportRequestSerializer, ImportPreviewSerializer, ImportResultSerializer
+from .serializers import CustomerPurchaseSerializer, CustomerSerializer, ImportRequestSerializer, ImportPreviewSerializer, ImportResultSerializer
 from .imports import SALT, fingerprint, parse_rows, validate_token
 
 
@@ -20,7 +20,7 @@ class CustomerViewSet(AuditedCrudMixin, mixins.CreateModelMixin, mixins.UpdateMo
                       mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
     serializer_class = CustomerSerializer
-    search_fields = ["reference", "name", "email", "phone"]
+    search_fields = ["reference", "name", "email", "phone", "mac_address"]
     ordering_fields = ["name", "reference", "created_at"]
     ordering = ["name", "id"]
 
@@ -116,3 +116,13 @@ class CustomerViewSet(AuditedCrudMixin, mixins.CreateModelMixin, mixins.UpdateMo
             customer = Customer.objects.create(tenant=tenant, **row)
             audit(request, "customer.imported", customer)
         return Response({"count": len(rows)}, status=201)
+
+
+    @extend_schema(responses=CustomerPurchaseSerializer(many=True))
+    @action(detail=True, methods=['get'])
+    def purchases(self, request, pk=None):
+        from apps.vouchers.models import PaymentTransaction
+        customer = self.get_object()
+        rows = PaymentTransaction.objects.filter(customer=customer, tenant=customer.tenant).select_related('plan', 'voucher').order_by('-created_at', '-pk')
+        page = self.paginate_queryset(rows)
+        return self.get_paginated_response(CustomerPurchaseSerializer(page, many=True).data)

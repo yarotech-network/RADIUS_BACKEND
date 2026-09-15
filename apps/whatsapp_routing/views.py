@@ -4,6 +4,7 @@ from apps.subscriptions.entitlements import require_whatsapp
 from apps.core.api import tenant_for
 from rest_framework import viewsets
 from rest_framework import permissions
+from rest_framework.exceptions import ValidationError
 import secrets
 from .models import TenantWhatsAppRoute
 from .serializers import TenantWhatsAppRouteSerializer
@@ -19,7 +20,7 @@ class WhatsAppRouteViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return TenantWhatsAppRoute.objects.none()
-        return TenantWhatsAppRoute.objects.filter(tenant=tenant_for(self.request))
+        return TenantWhatsAppRoute.objects.filter(tenant=tenant_for(self.request)).order_by("pk")
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -31,6 +32,8 @@ class WhatsAppRouteViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         with transaction.atomic():
             Tenant.objects.select_for_update().get(pk=tenant.pk)
             require_whatsapp(tenant)
+            if TenantWhatsAppRoute.objects.filter(tenant=tenant).exists():
+                raise ValidationError('WhatsApp connection details already exist. Edit the saved record.')
             serializer.save(tenant=tenant, webhook_token=secrets.token_urlsafe(32))
 
     def perform_update(self, serializer):

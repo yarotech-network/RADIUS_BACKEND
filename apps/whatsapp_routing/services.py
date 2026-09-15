@@ -1,6 +1,8 @@
 from .models import TenantWhatsAppRoute
 import hmac
 import hashlib
+import re
+from urllib.parse import quote
 
 
 def generate_route_url(tenant, base_url="https://wa.me"):
@@ -10,8 +12,11 @@ def generate_route_url(tenant, base_url="https://wa.me"):
         return None
     try:
         route = TenantWhatsAppRoute.objects.get(tenant=tenant, is_active=True)
+        number = route.display_number.lstrip('+')
+        if not re.fullmatch(r'[1-9][0-9]{6,14}', number):
+            return None
         token = route.generate_route_token()
-        return f"{base_url}/{route.phone_number_id}?text={token}"
+        return f"{base_url}/{number}?text={quote(token, safe='')}"
     except TenantWhatsAppRoute.DoesNotExist:
         return None
 

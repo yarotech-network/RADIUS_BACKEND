@@ -22,12 +22,12 @@ def validate_token(request, tenant, text, token):
 
 
 def parse_rows(text, tenant):
-    allowed = {"reference", "name", "email", "phone", "address", "notes"}
+    allowed = {"reference", "name", "email", "phone", "address", "notes", "mac_address"}
     try:
         reader = csv.DictReader(io.StringIO(text.lstrip("\ufeff")), strict=True)
         headers = reader.fieldnames or []
         if not {"reference", "name"}.issubset(headers) or len(headers) != len(set(headers)) or set(headers) - allowed:
-            raise ValidationError({"csv": "Use unique reference,name headers plus optional email,phone,address,notes."})
+            raise ValidationError({"csv": "Use unique reference,name headers plus optional email,phone,address,notes,mac_address. Name values may be blank."})
         rows, errors, seen = [], [], set()
         for index, row in enumerate(reader, start=2):
             if index > 201:
