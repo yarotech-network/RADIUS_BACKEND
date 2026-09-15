@@ -91,11 +91,16 @@ def paystack_webhook(request, token):
     except Exception:
         return JsonResponse({"error": "Payment verification unavailable"}, status=503)
 
+    try:
+        from apps.agents.funding_terms import funding_total
+        expected_amount = funding_total(payment) if kind == 'wallet' else payment.amount
+    except ValueError:
+        return JsonResponse({'error': 'Payment verification mismatch'}, status=400)
     if (
         not isinstance(verified, dict)
         or verified.get("status") != "success"
         or verified.get("reference") != reference
-        or verified.get("amount") != payment.amount
+        or type(verified.get("amount")) is not int or verified.get("amount") != expected_amount
         or verified.get("currency") != "NGN"
     ):
         return JsonResponse({"error": "Payment verification mismatch"}, status=400)
@@ -117,7 +122,7 @@ def paystack_webhook(request, token):
                 locked.paystack_reference = str(event_id)
                 locked.save(update_fields=["paystack_reference"])
             elif kind == "wallet":
-                AgentService.complete_wallet_funding(payment)
+                AgentService.complete_wallet_funding(payment, verified)
             else:
                 SubscriptionService.complete_payment(payment)
 

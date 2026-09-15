@@ -25,7 +25,7 @@ from django.db.models.deletion import ProtectedError
 
 
 class InternetPlanViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
-    filterset_fields = ["is_active", "duration_hours"]
+    filterset_fields = ["is_active", "duration_hours", "is_public", "agent_enabled", "plan_type"]
     search_fields = ["name"]
     ordering = ["price", "id"]
     serializer_class = InternetPlanSerializer
@@ -33,16 +33,18 @@ class InternetPlanViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return InternetPlan.objects.none()
-        return InternetPlan.objects.filter(tenant=tenant_for(self.request)).select_related("bandwidth_profile")
+        query = InternetPlan.objects.filter(tenant=tenant_for(self.request)).select_related("bandwidth_profile")
+        if self.action == 'list':
+            query = query.filter(archived_at__isnull=self.request.query_params.get('archived') != 'true')
+        if self.action in ('update', 'partial_update', 'destroy'):
+            query = query.select_for_update(of=('self',))
+        return query
 
     def perform_create(self, serializer):
         serializer.save(tenant=tenant_for(self.request))
 
     def perform_destroy(self, instance):
-        try:
-            instance.delete()
-        except ProtectedError:
-            raise ValidationError('This plan has vouchers or payment history. Deactivate it instead.')
+        instance.delete()
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -59,7 +61,7 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Voucher.objects.none()
-        return Voucher.objects.filter(tenant=tenant_for(self.request)).select_related("plan", "tenant", "agent__user").order_by("-created_at", "-id")
+        return Voucher.objects.filter(tenant=tenant_for(self.request), deleted_at__isnull=True).select_related("plan", "tenant", "agent__user").order_by("-created_at", "-id")
 
     def get_permissions(self):
         if self.action in ["list", "retrieve", "print", "pdf", "authorize_print"]:
@@ -67,7 +69,11 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
         return [IsTenantManager()]
 
     def perform_create(self, serializer):
+        plan = InternetPlan.objects.select_for_update().get(pk=serializer.validated_data['plan'].pk)
+        if not plan.is_active or plan.archived_at or plan.plan_type != 'voucher':
+            raise ValidationError('Plan is unavailable for new vouchers.')
         voucher = serializer.save(
+            plan=plan,
             tenant=tenant_for(self.request),
             generation_source="admin",
         )
@@ -75,8 +81,13 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         voucher = Voucher.objects.select_for_update().get(pk=serializer.instance.pk)
-        if voucher.status != "unused" or hasattr(voucher, "payment") or hasattr(voucher, "agent_allocation"):
+        if voucher.status != "unused" or voucher.legacy_provenance or voucher.is_used or voucher.first_used_at or voucher.used_at or voucher.last_used_at or voucher.expires_at or voucher.activated_at or voucher.deleted_at or hasattr(voucher, "payment") or hasattr(voucher, "agent_allocation"):
             raise ValidationError("Issued or purchased vouchers cannot be edited; use disable instead.")
+        if ('plan' in serializer.validated_data and serializer.validated_data['plan'].pk != voucher.plan_id) or ('device_limit' in serializer.validated_data and serializer.validated_data['device_limit'] != voucher.device_limit):
+            raise ValidationError('Issued plan and device capacity cannot be changed.')
+        if voucher.purchased_terms is None:
+            voucher.purchased_terms = voucher.service_terms
+            voucher.issued_duration_seconds = voucher.purchased_terms['duration_seconds']
         old_username = voucher.username
         old_snapshot = voucher.rate_limit_snapshot
         serializer.instance = voucher
@@ -88,7 +99,7 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         voucher = Voucher.objects.select_for_update().get(pk=instance.pk)
-        if voucher.status != "unused" or hasattr(voucher, "payment") or hasattr(voucher, "agent_allocation"):
+        if voucher.status != "unused" or voucher.legacy_provenance or voucher.is_used or voucher.first_used_at or voucher.used_at or voucher.last_used_at or voucher.expires_at or voucher.activated_at or voucher.deleted_at or hasattr(voucher, "payment") or hasattr(voucher, "agent_allocation"):
             raise ValidationError("Issued or purchased vouchers cannot be deleted; use disable instead.")
         Radcheck.objects.filter(username=voucher.username).delete()
         if voucher.rate_limit_snapshot:
@@ -109,6 +120,7 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
             tenant=tenant_for(request),
             plan_id=serializer.validated_data["plan_id"],
             quantity=serializer.validated_data["quantity"],
+            device_limit=serializer.validated_data["device_limit"],
             prefix=serializer.validated_data.get("prefix", ""),
             source="admin",
         )

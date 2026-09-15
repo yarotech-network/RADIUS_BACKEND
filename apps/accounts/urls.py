@@ -4,7 +4,11 @@ from . import views
 from .registration_api import RegistrationEmailView, RegistrationVerifyView, RegistrationCreateView
 from .session_api import LogoutView
 
+from .identity_api import EmailChangeView, EmailChangeConfirmView
+
 urlpatterns = [
+    path("auth/email-change/", EmailChangeView.as_view()),
+    path("auth/email-change/confirm/", EmailChangeConfirmView.as_view()),
     path("auth/registration/email/", RegistrationEmailView.as_view(), name="registration-email"),
     path("auth/registration/email/verify/", RegistrationVerifyView.as_view(), name="registration-verify"),
     path("auth/registration/", RegistrationCreateView.as_view(), name="registration-create"),

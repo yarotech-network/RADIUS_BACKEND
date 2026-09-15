@@ -1,3 +1,5 @@
+from apps.vouchers.test_support import authenticated_activation
+from apps.subscriptions.test_support import grant_test_subscription
 import hashlib
 import hmac
 import json
@@ -26,6 +28,7 @@ class PurchasedTermsTests(TransactionTestCase):
                     editor.create_model(model)
                 self.created_tables.append(model)
         self.tenant = Tenant.objects.create(name='Shop', slug='shop')
+        grant_test_subscription(self.tenant)
         TenantSetting.objects.create(tenant=self.tenant, paystack_secret_key='test-signing-key')
         self.owner = get_user_model().objects.create_user(username='owner')
         TenantMembership.objects.create(user=self.owner, tenant=self.tenant, role='owner')
@@ -81,14 +84,14 @@ class PurchasedTermsTests(TransactionTestCase):
             self.assertNotIn('Changed', body)
             self.assertIn('500', body)
         response = self.client.get('/api/v1/payments/callback/', {'reference': payment.reference})
-        self.assertEqual(response.data['plan'], {'name': 'Original', 'duration_hours': 24, 'data_limit': 1024})
+        self.assertEqual(response.data['plan'], {'name': 'Original', 'duration_hours': 24, 'data_limit': 1024, 'device_limit': 1})
         self.client.force_authenticate(self.owner)
         response = self.client.get(f'/api/v1/vouchers/{voucher.pk}/print/')
         self.assertContains(response, 'Original')
         self.assertContains(response, '24 hours')
         now = timezone.now()
         with patch('django.utils.timezone.now', return_value=now):
-            voucher.activate()
+            authenticated_activation(voucher)
         self.assertEqual(voucher.expires_at, now + timedelta(hours=24))
 
     def test_verification_honors_original_terms_after_edit_and_deactivation(self):
@@ -117,12 +120,13 @@ class PurchasedTermsTests(TransactionTestCase):
         fulfill_verified_voucher(payment, self.verified(payment))
         self.assert_original_voucher(payment)
 
-    def test_order_prevents_plan_deletion(self):
+    def test_order_survives_plan_archival(self):
         self.checkout()
         self.client.force_authenticate(self.owner)
         response = self.client.delete(f'/api/v1/plans/{self.plan.pk}/')
-        self.assertEqual(response.status_code, 400)
-        self.assertTrue(InternetPlan.objects.filter(pk=self.plan.pk).exists())
+        self.assertEqual(response.status_code, 204)
+        self.plan.refresh_from_db()
+        self.assertIsNotNone(self.plan.archived_at)
 
     def test_radius_failure_remains_recoverable_without_partial_issuance(self):
         payment = self.checkout()

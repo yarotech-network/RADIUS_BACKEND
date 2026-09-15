@@ -71,14 +71,14 @@ class ConcurrentApiTests(TransactionTestCase):
                 return "insufficient"
         self.assertCountEqual(self.parallel(spend), ["issued", "insufficient"])
         wallet.refresh_from_db()
-        self.assertEqual(wallet.balance, 0)
+        self.assertEqual(wallet.balance, 500)
         self.assertEqual(Voucher.objects.count(), 1)
 
     def test_duplicate_funding_completion_credits_once(self):
         agent = AgentProfile.objects.create(user=self.user, tenant=self.tenant, status="active", phone="08012345678")
         wallet = AgentWallet.objects.create(agent=agent)
         payment = AgentWalletFundingPayment.objects.create(wallet=wallet, amount=5000, reference="fund-once")
-        results = self.parallel(lambda: AgentService.complete_wallet_funding(payment))
+        results = self.parallel(lambda: AgentService.complete_wallet_funding(payment, {"status": "success", "reference": payment.reference, "amount": payment.amount, "currency": "NGN"}))
         self.assertCountEqual(results, [True, False])
         wallet.refresh_from_db()
         self.assertEqual(wallet.balance, 5000)

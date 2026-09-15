@@ -13,7 +13,8 @@ from apps.tenants.models import Tenant, TenantMembership
 from apps.vouchers.models import InternetPlan, Voucher
 from .entitlements import entitlement_terms
 from .models import SubscriptionPlan, TenantSubscription
-from .trials import assign_new_tenant_trial, TRIAL_TERMS
+from .trials import assign_new_tenant_trial, TRIAL_TERMS, TRIAL_CODE
+from rest_framework.exceptions import PermissionDenied
 
 
 class SignupTrialTests(APITestCase):
@@ -30,7 +31,7 @@ class SignupTrialTests(APITestCase):
         self.assertEqual(body['entitlements']['terms'], TRIAL_TERMS)
         for number, expected in [(1, 201), (2, 403)]:
             response = self.client.post('/api/v1/routers/', {
-                'name': f'Router {number}', 'ip_address': f'10.0.0.{number}', 'nas_secret': 'test-only',
+                'name': f'Router {number}', 'ip_address': f'10.0.0.{number}', 'nas_secret': 'test-only', 'is_active':True,
             })
             self.assertEqual(response.status_code, expected, response.data)
         plan = InternetPlan.objects.create(tenant=self.tenant, name='Daily', price=100, duration_hours=24, rate_limit='1M/1M')
@@ -53,7 +54,8 @@ class SignupTrialTests(APITestCase):
 
     def test_legacy_tenants_are_unchanged_and_trial_cannot_be_reset(self):
         legacy = Tenant.objects.create(name='Legacy', slug='legacy')
-        self.assertIsNone(entitlement_terms(legacy)['max_routers'])
+        with self.assertRaises(PermissionDenied):
+            entitlement_terms(legacy)
         self.assertFalse(TenantSubscription.objects.filter(tenant=legacy).exists())
         again = assign_new_tenant_trial(self.tenant)
         self.assertEqual(again.pk, self.subscription.pk)
@@ -74,11 +76,11 @@ class SignupTrialTests(APITestCase):
     def test_platform_created_tenant_receives_trial(self):
         self.owner.is_platform_admin = True
         self.owner.save()
-        response = self.client.post('/api/v1/tenants/', {'name': 'Admin created', 'slug': 'admin-created'})
+        response = self.client.post('/api/v1/tenants/', {'name': 'Admin created', 'slug': 'admin-created', 'owner_email':'new-owner@example.test', 'owner_username':'new-owner', 'is_active':True})
         self.assertEqual(response.status_code, 201, response.data)
         created = Tenant.objects.get(pk=response.data['id'])
         self.assertEqual(entitlement_terms(created), TRIAL_TERMS)
-        self.assertEqual(SubscriptionPlan.objects.filter(internal_code='signup-trial-v1').count(), 1)
+        self.assertEqual(SubscriptionPlan.objects.filter(internal_code=TRIAL_CODE).count(), 1)
 
 
 class ConcurrentTrialTests(TransactionTestCase):
@@ -95,6 +97,6 @@ class ConcurrentTrialTests(TransactionTestCase):
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(assign, tenants))
         self.assertEqual(len(set(results)), 2)
-        self.assertEqual(SubscriptionPlan.objects.filter(internal_code='signup-trial-v1').count(), 1)
+        self.assertEqual(SubscriptionPlan.objects.filter(internal_code=TRIAL_CODE).count(), 1)
         for tenant in tenants:
             self.assertEqual(entitlement_terms(tenant), TRIAL_TERMS)

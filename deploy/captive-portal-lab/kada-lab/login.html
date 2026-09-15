@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="pragma" content="no-cache" />
+    <meta http-equiv="expires" content="-1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#020817" />
+    <title>Kada Space X - Hotspot Login</title>
+    <link rel="icon" type="image/png" href="img/kada-space-x-logo.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="yarotech-login">
+
+    <!-- two other colors
+
+<body class="lite">
+<body class="dark">
+
+-->
+
+    $(if chap-id)
+    <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
+        <input type="hidden" name="username" />
+        <input type="hidden" name="password" />
+        <input type="hidden" name="dst" value="http://10.40.0.1/status" />
+        <input type="hidden" name="popup" value="false" />
+    </form>
+
+    <script src="md5.js"></script>
+    <script>
+        function doLogin() {
+            document.sendin.username.value = document.login.username.value;
+            document.sendin.password.value = hexMD5('$(chap-id)' + document.login.password.value + '$(chap-challenge)');
+            document.sendin.submit();
+            return false;
+        }
+
+    </script>
+    $(endif)
+    <script>
+        function prepareLogin() {
+            $(if chap-id)
+            return doLogin();
+            $(else)
+            return true;
+            $(endif)
+        }
+    </script>
+    <div class="ie-fixMinHeight">
+        <div class="main">
+            <div class="wrap login-shell animated fadeIn">
+                <section class="brand-panel" aria-label="Kada Space X network">
+                    <div class="brand-panel-content">
+                        <img class="hero-logo" src="img/kada-space-x-logo.png" alt="Kada Space X logo" />
+                        <p class="brand-kicker">KADA SPACE X</p>
+                        <h2>Your Wi-Fi.<br><span>Your space.</span></h2>
+                        <p class="brand-copy">Welcome to the Kada Space X local Wi-Fi lab.</p>
+                        <div class="network-features">
+                            <span><i></i> Local Wi-Fi access</span>
+                            <span><i></i> Password login</span>
+                            <span><i></i> Lab testing</span>
+                        </div>
+                    </div>
+                    <p class="brand-footnote">Kada Space X &bull; Premium WiFi</p>
+                </section>
+
+                <div class="login-panel">
+                <form name="login" action="$(link-login-only)" method="post" onSubmit="return prepareLogin()">
+                    <input type="hidden" name="dst" value="http://10.40.0.1/status" />
+                    <input type="hidden" name="popup" value="false" />
+                    <div class="brand-mark">
+                        <img class="brand-logo" src="img/kada-space-x-logo.png" alt="Kada Space X logo" />
+                    </div>
+                    <div class="online-status" aria-label="Local lab network">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3.5 9.5a12.5 12.5 0 0 1 17 0l-1.8 1.9a9.9 9.9 0 0 0-13.4 0L3.5 9.5Zm3.4 3.4a7.5 7.5 0 0 1 10.2 0l-1.8 1.9a4.9 4.9 0 0 0-6.6 0l-1.8-1.9Zm3.4 3.5a2.5 2.5 0 0 1 3.4 0L12 18.2l-1.7-1.8Z"/>
+                        </svg>
+                        <span>LOCAL LAB</span>
+                    </div>
+                    <h1>Welcome to Kada Space X WiFi</h1>
+                    <p class="tagline">Local Hotspot login test. Internet service is not connected.</p>
+                    <p class="info $(if error)alert$(endif)">
+                        $(if error == "")Please log in to test local Hotspot access $(if trial == 'yes')<br />Free trial available, <a href="$(link-login-only)?dst=$(link-orig-esc)&amp;username=T-$(mac-esc)">click here</a>.$(endif)
+                        $(endif)
+
+                        $(if error)$(error)$(endif)
+                    </p>
+                    <label class="code-field">
+                        <img class="ico" src="img/user.svg" alt="#" />
+                        <input name="username" type="text" value="$(username)" placeholder="Hotspot username" aria-label="Hotspot username" autocomplete="off" autocapitalize="none" spellcheck="false" required />
+                    </label>
+                    <label class="code-field">
+                        <img class="ico" src="img/password.svg" alt="" />
+                        <input name="password" type="password" placeholder="Hotspot password" aria-label="Hotspot password" autocomplete="current-password" required />
+                    </label>
+                    <p class="code-note">Use your router-local test username and password. System vouchers are not enabled in this lab.</p>
+
+                    <input type="submit" value="Log in to Wi-Fi" />
+
+                    <p class="code-note">Purchases and voucher recovery are unavailable in this offline lab.</p>
+
+                    <p class="secure-note"><span aria-hidden="true">&#10003;</span> Local Hotspot access</p>
+
+                    <p class="code-note">For help, contact the lab operator.</p>
+
+                </form>
+                <p class="info bt powered-credit">Kada Space X &bull; Powered by Yarotech Group</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

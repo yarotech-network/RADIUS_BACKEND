@@ -1,3 +1,4 @@
+from rest_framework import generics
 from apps.payments.callbacks import payment_callback_url
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
@@ -17,6 +18,10 @@ from .models import AgentWalletFundingPayment
 from drf_spectacular.utils import extend_schema
 from .serializers import FundingCheckoutSerializer, AgentGeneratedVouchersSerializer
 from .serializers import AgentVoucherGenerateSerializer
+from .serializers import AgentPlanSerializer, AgentWalletTransactionSerializer
+from .models import AgentWalletTransaction
+from .serializers import FundingVerificationSerializer, FundingPolicySerializer
+from rest_framework.throttling import ScopedRateThrottle
 
 
 class AgentProfileViewSet(viewsets.ModelViewSet):
@@ -36,9 +41,44 @@ class AgentProfileViewSet(viewsets.ModelViewSet):
 
 
 class AgentWalletViewSet(viewsets.GenericViewSet):
+    throttle_scope = 'agent_funding_verify'
     queryset = AgentWallet.objects.none()
     serializer_class = AgentWalletSerializer
     permission_classes = [IsAgent]
+
+    @extend_schema(responses=FundingPolicySerializer)
+    @action(detail=False, methods=['get'])
+    def policy(self, request):
+        from apps.tenants.models import TenantSetting
+        from .funding_terms import funding_policy
+        setting = TenantSetting.objects.filter(tenant=request.user.agent_profile.tenant).first()
+        return Response(FundingPolicySerializer(funding_policy(setting)).data)
+
+    @extend_schema(request=FundingVerificationSerializer, responses=AgentFundingPaymentSerializer)
+    @action(detail=False, methods=['post'], throttle_classes=[ScopedRateThrottle])
+    def verify(self, request):
+        from django.shortcuts import get_object_or_404
+        from .funding import verify_wallet_funding, FundingVerificationUnavailable, FundingVerificationMismatch
+        serializer = FundingVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payment = get_object_or_404(AgentWalletFundingPayment,
+            wallet__agent=request.user.agent_profile, reference=serializer.validated_data['reference'])
+        try:
+            payment = verify_wallet_funding(payment)
+        except FundingVerificationUnavailable:
+            return Response({'detail': 'Payment verification is temporarily unavailable. Retry checking this reference before paying again.'}, status=503)
+        except FundingVerificationMismatch:
+            return Response({'detail': 'Payment details could not be matched. Contact your operator before paying again.'}, status=409)
+        return Response(AgentFundingPaymentSerializer(payment).data)
+
+    @extend_schema(responses=AgentWalletTransactionSerializer(many=True))
+    @action(detail=False, methods=['get'])
+    def transactions(self, request):
+        query = AgentWalletTransaction.objects.filter(
+            wallet__agent=request.user.agent_profile,
+        ).order_by('-created_at', '-id')
+        page = self.paginate_queryset(query)
+        return self.get_paginated_response(AgentWalletTransactionSerializer(page, many=True).data)
 
     @extend_schema(responses=AgentFundingPaymentSerializer(many=True))
     @action(detail=False, methods=["get"])
@@ -70,11 +110,17 @@ class AgentWalletViewSet(viewsets.GenericViewSet):
 
         import secrets
         reference = f"agent-fund-{secrets.token_hex(12)}"
-        payment = AgentService.fund_wallet(
-            agent=request.user.agent_profile,
-            amount=serializer.validated_data["amount"],
-            reference=reference,
-        )
+        try:
+            payment = AgentService.fund_wallet(
+                agent=request.user.agent_profile,
+                amount=serializer.validated_data['amount'],
+                reference=reference,
+                expected_total=serializer.validated_data.get('expected_total'),
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=400)
+        from .funding_terms import funding_total
+        totals = {'amount': payment.amount, 'fee': funding_total(payment) - payment.amount, 'total_amount': funding_total(payment)}
 
         # Initialize Paystack
         from apps.payments.services import get_paystack_service
@@ -82,17 +128,18 @@ class AgentWalletViewSet(viewsets.GenericViewSet):
             service = get_paystack_service(request.user.agent_profile.tenant)
             result = service.initialize_transaction(
                 email=request.user.email,
-                amount=payment.amount,
+                amount=totals['total_amount'],
                 reference=reference,
                 callback_url=payment_callback_url("wallet"),
             )
             authorization_url = result["data"]["authorization_url"]
         except Exception:
-            return Response({"error": "Payment provider unavailable", "reference": reference}, status=503)
+            return Response({"error": "Payment provider unavailable", "reference": reference, **totals}, status=503)
 
         return Response({
             "authorization_url": authorization_url,
             "reference": reference,
+            **totals,
         })
 
 
@@ -138,3 +185,16 @@ class AgentVoucherGenerateView(viewsets.GenericViewSet):
     def stats(self, request):
         stats = AgentService.get_agent_stats(request.user.agent_profile)
         return Response(AgentStatsSerializer(stats).data)
+
+
+class AgentPlansView(generics.ListAPIView):
+    permission_classes = [IsAgent]
+    serializer_class = AgentPlanSerializer
+
+    def get_queryset(self):
+        from apps.vouchers.models import InternetPlan
+        if getattr(self, 'swagger_fake_view', False):
+            return InternetPlan.objects.none()
+        return InternetPlan.objects.filter(tenant=self.request.user.agent_profile.tenant,
+            is_active=True, agent_enabled=True, archived_at__isnull=True,
+            plan_type='voucher').order_by('price', 'id')

@@ -1,3 +1,6 @@
+from apps.vouchers.test_support import authenticated_activation
+from apps.subscriptions.test_support import grant_test_subscription
+from apps.vouchers.radius_test_support import RadiusTablesMixin
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -15,7 +18,7 @@ from .services import VoucherService
 User = get_user_model()
 
 
-class VoucherFixtureMixin:
+class VoucherFixtureMixin(RadiusTablesMixin):
     def make_plan(self, tenant, name="Standard", price=100_000):
         return InternetPlan.objects.create(
             tenant=tenant,
@@ -29,6 +32,7 @@ class VoucherFixtureMixin:
 class VoucherServiceTests(VoucherFixtureMixin, APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant)
         self.plan = self.make_plan(self.tenant)
 
     @patch("apps.vouchers.services.Radcheck.objects.create")
@@ -37,7 +41,7 @@ class VoucherServiceTests(VoucherFixtureMixin, APITestCase):
 
         self.assertEqual(len(vouchers), 2)
         self.assertEqual(Voucher.objects.filter(tenant=self.tenant).count(), 2)
-        self.assertEqual(radius_create.call_count, 4)
+        self.assertEqual(radius_create.call_count, 6)
         self.assertTrue(all(voucher.username.startswith("A-") for voucher in vouchers))
 
     @patch("apps.vouchers.services.Radcheck.objects.create")
@@ -107,7 +111,7 @@ class VoucherServiceTests(VoucherFixtureMixin, APITestCase):
         )
         before = timezone.now()
 
-        activated = VoucherService.activate_voucher(voucher)
+        activated = authenticated_activation(voucher)
 
         voucher.refresh_from_db()
         self.assertTrue(activated)
@@ -119,7 +123,9 @@ class VoucherServiceTests(VoucherFixtureMixin, APITestCase):
 class VoucherApiTests(VoucherFixtureMixin, APITestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant_a)
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        grant_test_subscription(self.tenant_b)
         self.plan_a = self.make_plan(self.tenant_a, name="Plan A")
         self.plan_b = self.make_plan(self.tenant_b, name="Plan B")
         self.manager = User.objects.create_user(

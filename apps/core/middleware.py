@@ -27,7 +27,7 @@ class ApiErrorEnvelopeMiddleware:
         message = data.get("detail") or data.get("error") or "Check the submitted fields."
         if not isinstance(message, str):
             message = "The request could not be completed."
-        data["problem"] = {"code": f"http_{response.status_code}", "message": message, "fields": fields}
+        data["problem"] = {"code": ("subscription_required" if data.get("code") == "subscription_required" else f"http_{response.status_code}"), "message": message, "fields": fields}
         response.content = json.dumps(data, cls=DjangoJSONEncoder)
         response["Content-Type"] = "application/json"
         response["Content-Length"] = len(response.content)

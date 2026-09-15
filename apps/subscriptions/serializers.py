@@ -32,8 +32,7 @@ class TenantSubscriptionSerializer(serializers.ModelSerializer):
         return not obj.is_active
 
     def get_entitlements(self, obj) -> dict:
-        from apps.routers.models import NASDevice
-        from .entitlements import current_period, print_day, snapshot_plan
+        from .entitlements import current_period, print_day, snapshot_plan, router_usage
         from .models import VoucherPrintAuthorization, SubscriptionPeriod
         from django.utils import timezone
         period = current_period(obj.tenant) or SubscriptionPeriod.objects.filter(tenant=obj.tenant, starts_at__lte=timezone.now(), superseded=False).order_by("-ends_at").first()
@@ -42,7 +41,7 @@ class TenantSubscriptionSerializer(serializers.ModelSerializer):
             "terms": terms,
             "plan_id": period.plan_id if period else obj.plan_id,
             "enabled": obj.is_active,
-            "routers_used": NASDevice.objects.filter(tenant=obj.tenant).count(),
+            "routers_used": router_usage(obj.tenant),
             "vouchers_prepared_today": VoucherPrintAuthorization.objects.filter(tenant=obj.tenant, day=print_day()).count(),
             "day": str(print_day()), "timezone": "Africa/Lagos",
             "upcoming": [{"starts_at": item.starts_at, "ends_at": item.ends_at, "terms": item.terms} for item in SubscriptionPeriod.objects.filter(tenant=obj.tenant, superseded=False, starts_at__gt=timezone.now()).order_by("starts_at")],

@@ -1,3 +1,4 @@
+from apps.subscriptions.test_support import grant_test_subscription
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -28,7 +29,9 @@ class BandwidthTests(APITestCase):
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name='A', slug='bandwidth-a')
+        grant_test_subscription(self.tenant)
         self.other = Tenant.objects.create(name='B', slug='bandwidth-b')
+        grant_test_subscription(self.other)
         User = get_user_model()
         self.manager = User.objects.create_user(username='band-manager', email='band-manager@example.com')
         self.staff = User.objects.create_user(username='band-staff', email='band-staff@example.com')
@@ -103,10 +106,10 @@ class BandwidthTests(APITestCase):
         VoucherService.disable_voucher(voucher)
         self.assertFalse(Radreply.objects.filter(username=voucher.username).exists())
 
-    def test_legacy_issuance_is_not_silently_backfilled(self):
+    def test_new_custom_rate_issuance_is_enforced(self):
         voucher = VoucherService.generate_vouchers(self.tenant,self.plan.pk,1)[0]
-        self.assertEqual(voucher.rate_limit_snapshot,'')
-        self.assertFalse(Radreply.objects.exists())
+        self.assertEqual(voucher.rate_limit_snapshot,'5M/10M')
+        self.assertEqual(Radreply.objects.get(username=voucher.username).value, '5M/10M')
 
     def test_radius_failure_rolls_back_voucher_and_credentials(self):
         self.attach()

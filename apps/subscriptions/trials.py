@@ -7,9 +7,9 @@ from django.utils import timezone
 from apps.tenants.models import Tenant
 from .models import SubscriptionPlan, SubscriptionPeriod, TenantSubscription
 
-TRIAL_CODE = 'signup-trial-v1'
+TRIAL_CODE = 'signup-trial-v2-30-days'
 TRIAL_TERMS = {
-    'name': '15-day trial', 'price': 0, 'duration_days': 15,
+    'name': '30-day trial', 'price': 0, 'duration_days': 30,
     'max_routers': 1, 'daily_voucher_print_limit': 50,
     'whatsapp_enabled': False, 'version': 1,
 }

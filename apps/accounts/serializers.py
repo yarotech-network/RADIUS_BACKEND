@@ -10,13 +10,33 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.CharField(read_only=True)
+    workspace_role = serializers.SerializerMethodField()
+    membership_active = serializers.SerializerMethodField()
+
+    def get_workspace_role(self, user) -> str | None:
+        from apps.core.api import active_membership
+        from rest_framework.exceptions import PermissionDenied
+        try:
+            membership = active_membership(user)
+        except PermissionDenied:
+            return None
+        return membership.role if membership else None
+
+    def get_membership_active(self, user) -> bool:
+        return self.get_workspace_role(user) is not None
+
+    def validate_email(self, value):
+        if self.instance and value != self.instance.email:
+            raise serializers.ValidationError("Use Change email to verify a replacement address.")
+        return value
+
     tenant_id = serializers.IntegerField(source="membership.tenant_id", read_only=True, default=None)
     tenant_name = serializers.CharField(source="membership.tenant.name", read_only=True, default=None)
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "phone", "role", "tenant_name", "tenant_id"]
-        read_only_fields = ["id", "role", "tenant_name"]
+        fields = ["id", "username", "email", "first_name", "last_name", "phone", "role", "tenant_name", "tenant_id", "is_platform_admin", "workspace_role", "membership_active"]
+        read_only_fields = ["id", "role", "tenant_name", "is_platform_admin"]
 
 
 class LoginSerializer(serializers.Serializer):

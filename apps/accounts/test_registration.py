@@ -59,7 +59,7 @@ class RegistrationTests(RegistrationSetup, TestCase):
         subscription = user.membership.tenant.subscription
         self.assertEqual(subscription.status, 'trial')
         self.assertTrue(subscription.is_trial)
-        self.assertEqual(subscription.expires_at - subscription.started_at, timedelta(days=15))
+        self.assertEqual(subscription.expires_at - subscription.started_at, timedelta(days=30))
         from apps.subscriptions.entitlements import entitlement_terms
         terms = entitlement_terms(user.membership.tenant)
         self.assertEqual(terms['max_routers'], 1)

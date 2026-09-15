@@ -1,12 +1,14 @@
 from rest_framework import serializers
 
 from apps.vouchers.models import InternetPlan
+from apps.vouchers.device_policy import NewDeviceCountField
 
 
 class InitializePaymentSerializer(serializers.Serializer):
+    device_limit = NewDeviceCountField()
     plan_id = serializers.PrimaryKeyRelatedField(
         source="plan",
-        queryset=InternetPlan.objects.filter(is_active=True, tenant__is_active=True),
+        queryset=InternetPlan.objects.filter(is_active=True, is_public=True, archived_at__isnull=True, plan_type='voucher', tenant__is_active=True),
     )
     email = serializers.EmailField()
     name = serializers.CharField(max_length=200, required=False, allow_blank=True)

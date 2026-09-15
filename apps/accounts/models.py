@@ -11,7 +11,8 @@ class User(AbstractUser):
     """Custom user model with role support."""
 
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=20, blank=True)
+    owner_setup_pending = models.BooleanField(default=False, db_default=False)
+    phone = models.CharField(max_length=30, blank=True)
     is_platform_admin = models.BooleanField(default=False)
     # Null until the email address has been confirmed. Defaults to "verified now"
     # for accounts created through internal flows (agents, staff invitations,
@@ -30,7 +31,7 @@ class User(AbstractUser):
     def role(self):
         if self.is_platform_admin:
             return "platform_admin"
-        if hasattr(self, "membership"):
+        if hasattr(self, "membership") and self.membership.is_active and self.membership.tenant.is_active:
             return self.membership.role
         if hasattr(self, "agent_profile"):
             return "agent"
@@ -80,3 +81,13 @@ class RegistrationEmailChallenge(models.Model):
     class Meta:
         db_table = 'accounts_registration_email_challenge'
         indexes = [models.Index(fields=['expires_at'], name='registration_expiry_idx')]
+
+
+class EmailChangeRequest(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    email = models.EmailField()
+    code_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    requested_at = models.DateTimeField(default=timezone.now)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True)

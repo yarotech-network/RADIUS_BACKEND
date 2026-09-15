@@ -8,6 +8,9 @@ from rest_framework.exceptions import ValidationError
 
 
 def custom_exception_handler(exc, context):
+    from apps.subscriptions.access import SubscriptionRequired
+    if isinstance(exc, SubscriptionRequired):
+        return Response({'detail':str(exc.detail), 'code':'subscription_required'}, status=403)
     if isinstance(exc, DjangoValidationError):
         exc = ValidationError(getattr(exc, "message_dict", None) or exc.messages)
     if isinstance(exc, ProtectedError):

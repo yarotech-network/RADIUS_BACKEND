@@ -61,4 +61,11 @@ class MacDeviceSerializer(serializers.ModelSerializer):
         # Older records can remain unassigned; the new router-bound workflow must select a router.
         if "access_type" in attrs and not attrs.get("router", getattr(self.instance, "router", None)):
             raise serializers.ValidationError({"router": "Choose a router for this device."})
+        plan = attrs.get('plan', getattr(self.instance, 'plan', None))
+        router = attrs.get('router', getattr(self.instance, 'router', None))
+        assigning = self.instance is None or ('plan' in attrs and attrs['plan'].pk != self.instance.plan_id)
+        if assigning and plan and (not plan.is_active or plan.archived_at):
+            raise serializers.ValidationError({'plan': 'Choose an active, unarchived plan.'})
+        if plan and plan.public_router_id and (not router or router.pk != plan.public_router_id):
+            raise serializers.ValidationError({'router': 'This plan is restricted to its configured router.'})
         return attrs

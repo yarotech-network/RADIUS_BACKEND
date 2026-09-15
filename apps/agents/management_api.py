@@ -12,6 +12,7 @@ from apps.core.permissions import IsTenantManager
 from .models import AgentProfile, AgentWallet
 from .serializers import AgentProfileSerializer
 from drf_spectacular.utils import extend_schema
+from .credit_api import AgentCreditActions
 
 
 class AgentCreateSerializer(serializers.Serializer):
@@ -39,7 +40,7 @@ class AgentEditSerializer(serializers.ModelSerializer):
         fields = ["phone", "shop_name", "commission_rate"]
 
 
-class AgentManagementViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class AgentManagementViewSet(AgentCreditActions, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsTenantManager]
     serializer_class = AgentProfileSerializer
     filterset_fields = ["status"]

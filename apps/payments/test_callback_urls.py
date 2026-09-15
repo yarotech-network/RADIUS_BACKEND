@@ -1,3 +1,4 @@
+from apps.subscriptions.test_support import grant_test_subscription
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
@@ -40,6 +41,7 @@ class CallbackUrlTests(SimpleTestCase):
 class CheckoutReturnTests(APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Return test", slug="return-test")
+        grant_test_subscription(self.tenant)
         users = get_user_model()
         self.owner = users.objects.create_user(username="owner", email="owner@example.test")
         TenantMembership.objects.create(user=self.owner, tenant=self.tenant, role="owner")

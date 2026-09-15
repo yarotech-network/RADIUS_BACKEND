@@ -15,6 +15,8 @@ User = get_user_model()
 class WhatsAppRoutingTests(APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        from apps.subscriptions.test_support import grant_test_subscription
+        grant_test_subscription(self.tenant)
         self.manager = User.objects.create_user(username="manager", email="manager@example.com", password="StrongPass-4821")
         self.staff = User.objects.create_user(username="staff", email="staff@example.com", password="StrongPass-4821")
         TenantMembership.objects.create(user=self.manager, tenant=self.tenant, role="manager")

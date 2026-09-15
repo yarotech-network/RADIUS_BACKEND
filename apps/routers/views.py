@@ -59,14 +59,19 @@ class NASDeviceViewSet(HotspotSetupActions, RouterOperationActions, AuditedCrudM
         tenant = tenant_for(self.request)
         with transaction.atomic():
             Tenant.objects.select_for_update().get(pk=tenant.pk)
-            require_router_slot(tenant)
+            require_router_slot(tenant, consumes_slot=serializer.validated_data.get("is_active", True))
             serializer.save(tenant=tenant)
 
     def perform_update(self, serializer):
         if any(field in serializer.validated_data for field in ("nas_secret", "routeros_password_encrypted")):
             raise ValidationError("Use replace-secrets with your current password and the router version.")
         with transaction.atomic():
+            from apps.tenants.models import Tenant
+            from apps.subscriptions.entitlements import require_router_slot
+            tenant = Tenant.objects.select_for_update().get(pk=serializer.instance.tenant_id)
             router = NASDevice.objects.select_for_update().get(pk=serializer.instance.pk)
+            if not router.is_active and serializer.validated_data.get("is_active", False):
+                require_router_slot(tenant)
             if router.deployment_status == "deploying" or router.operations.filter(status__in=["pending", "running"]).exists():
                 raise RouterBusy()
             serializer.instance = router

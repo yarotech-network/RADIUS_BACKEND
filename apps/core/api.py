@@ -26,13 +26,36 @@ def assigned_tenant(request, view=None):
     return assignment.tenant
 
 
+def platform_context(request):
+    return bool(request.user.is_authenticated and request.user.is_active
+                and request.user.is_platform_admin
+                and request.headers.get("X-Access-Context", "platform") == "platform")
+
+
+def active_membership(user):
+    if not user.is_authenticated or not user.is_active:
+        return None
+    membership = getattr(user, "membership", None)
+    agent = getattr(user, "agent_profile", None)
+    if membership and agent and membership.tenant_id != agent.tenant_id:
+        raise PermissionDenied("Conflicting tenant identities require administrator review.")
+    if membership and membership.is_active and membership.tenant.is_active:
+        return membership
+    return None
+
+
 def tenant_for(request):
-    membership = getattr(request.user, "membership", None)
-    if membership is None:
-        return assigned_tenant(request)
-    if not membership.tenant.is_active:
+    if request.headers.get("X-Access-Context", "platform") not in ("platform", "workspace"):
+        raise PermissionDenied("Unknown access context.")
+    if request.user.is_platform_admin and request.headers.get("X-Access-Context") != "workspace":
+        raise PermissionDenied("Switch to My workspace to use tenant services.")
+    membership = active_membership(request.user)
+    if membership is not None:
+        return membership.tenant
+    # An inactive membership must not fall through to delegated staff grants.
+    if hasattr(request.user, "membership") or request.user.is_platform_admin:
         raise PermissionDenied("An active tenant membership is required.")
-    return membership.tenant
+    return assigned_tenant(request)
 
 
 def audit(request, action, obj, details=None):

@@ -107,7 +107,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.subscriptions.authentication.SubscriptionJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -129,6 +129,7 @@ REST_FRAMEWORK = {
         "router_hotspot_setup": "30/minute",
         "router_discovery": "3/minute",
         "subscription_verify": "10/minute",
+        "agent_funding_verify": "10/minute",
         "storefront_verify": "10/minute",
     },
 }
@@ -151,7 +152,7 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = True
 from corsheaders.defaults import default_headers
-CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key", "x-tenant-id"]
+CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key", "x-tenant-id", "x-access-context"]
 CORS_EXPOSE_HEADERS = ["Idempotency-Replayed", "Retry-After"]
 
 # === DRF Spectacular ===
@@ -246,3 +247,6 @@ PPPOE_RADIUS_TOKEN = config("PPPOE_RADIUS_TOKEN", default="")
 import json
 ROUTER_LOCAL_LAN_TARGETS = config("ROUTER_LOCAL_LAN_TARGETS", default="{}", cast=json.loads)
 ROUTER_LOCAL_LAN_WIFI_EXTENSIONS = config("ROUTER_LOCAL_LAN_WIFI_EXTENSIONS", default="{}", cast=json.loads)
+
+# New storefront and batch device selection; enable after RADIUS capacity rehearsal.
+MULTI_DEVICE_VOUCHERS_ENABLED = config("MULTI_DEVICE_VOUCHERS_ENABLED", default=False, cast=bool)

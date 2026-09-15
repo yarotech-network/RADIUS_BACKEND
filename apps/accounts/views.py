@@ -41,11 +41,20 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = authenticate(
-            request=request,
-            username=serializer.validated_data["username"],
-            password=serializer.validated_data["password"],
-        )
+        from django.db.models import Q
+        identifier = serializer.validated_data["username"].strip()
+        candidates = list(User.objects.filter(Q(username=identifier) | Q(email__iexact=identifier))[:2])
+        # Never guess if one account's username is another account's email.
+        if len(candidates) != 1:
+            # Match the normal password hashing cost for unknown/ambiguous identifiers.
+            User().set_password(serializer.validated_data["password"])
+            user = None
+        else:
+            user = authenticate(
+                request=request,
+                username=candidates[0].username,
+                password=serializer.validated_data["password"],
+            )
         if user is not None:
             if user.email_verified_at is None and not (
                 user.is_superuser or user.is_platform_admin
@@ -112,7 +121,7 @@ class VerifyEmailView(APIView):
         code = serializer.validated_data["code"]
 
         user = User.objects.filter(email__iexact=email).first()
-        if user is None or user.email_verified_at is not None:
+        if user is None or not user.is_active or user.owner_setup_pending or user.email_verified_at is not None:
             # Same response for unknown addresses and already-verified accounts:
             # never confirm which emails exist. Already-verified users are nudged
             # to sign in by the generic message below.
@@ -149,7 +158,7 @@ class ResendVerificationView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
 
-        user = User.objects.filter(email__iexact=email, email_verified_at__isnull=True).first()
+        user = User.objects.filter(email__iexact=email, email_verified_at__isnull=True, is_active=True, owner_setup_pending=False).first()
         sent = False
         if user is not None:
             latest = user.email_codes.order_by("-created_at").first()
@@ -257,6 +266,16 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.set_password(serializer.validated_data["password"])
-        user.save(update_fields=["password"])
+        from django.db import transaction
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if not user.is_active or not default_token_generator.check_token(user, serializer.validated_data["token"]):
+                return Response({"error": "Invalid or expired password reset link."}, status=400)
+            user.set_password(serializer.validated_data["password"])
+            fields = ["password"]
+            if user.owner_setup_pending:
+                user.owner_setup_pending = False
+                user.email_verified_at = timezone.now()
+                fields += ["owner_setup_pending", "email_verified_at"]
+            user.save(update_fields=fields)
         return Response({"message": "Password reset successful."})

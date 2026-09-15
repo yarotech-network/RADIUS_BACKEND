@@ -25,6 +25,7 @@ class InitializePaymentView(APIView):
         serializer = InitializePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         plan = serializer.validated_data["plan"]
+        device_limit = serializer.validated_data["device_limit"]
         email = serializer.validated_data["email"]
         name = serializer.validated_data.get("name", "")
         phone = serializer.validated_data.get("phone", "")
@@ -33,12 +34,15 @@ class InitializePaymentView(APIView):
         # Freeze terms with the order; provider I/O starts only after commit.
         with db_transaction.atomic():
             plan = InternetPlan.objects.select_for_update(of=('self',)).select_related('bandwidth_profile').get(pk=plan.pk)
-            if not plan.is_active or not plan.tenant.is_active:
+            if not plan.is_active or not plan.is_public or plan.archived_at or plan.plan_type != 'voucher' or not plan.tenant.is_active:
                 raise ValidationError({'plan_id': 'This plan is no longer available.'})
+            from apps.subscriptions.access import require_tenant_access
+            require_tenant_access(plan.tenant)
+            terms = snapshot_plan(plan, device_limit)
             transaction = PaymentTransaction.objects.create(
-                reference=reference, amount=plan.price, customer_email=email,
+                reference=reference, amount=terms["price"], customer_email=email,
                 customer_name=name, customer_phone=phone, plan=plan, tenant=plan.tenant,
-                purchased_terms=snapshot_plan(plan),
+                purchased_terms=terms,
             )
 
         # Initialize Paystack
@@ -46,11 +50,12 @@ class InitializePaymentView(APIView):
         try:
             result = service.initialize_transaction(
                 email=email,
-                amount=plan.price,
+                amount=transaction.amount,
                 reference=reference,
                 callback_url=payment_callback_url("voucher"),
                 metadata={
                     "transaction_id": transaction.id,
+                    "device_limit": device_limit,
                     "plan_id": plan.id,
                     "custom_fields": [
                         {"display_name": "Plan", "variable_name": "plan", "value": plan.name},
@@ -60,12 +65,13 @@ class InitializePaymentView(APIView):
             authorization_url = result["data"]["authorization_url"]
         except Exception:
             return Response(
-                {"error": "Payment provider unavailable", "reference": reference},
+                {"error": "Payment provider unavailable", "reference": reference, "amount": transaction.amount, "device_limit": device_limit},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         return Response({
             "authorization_url": authorization_url,
+            "amount": transaction.amount, "device_limit": device_limit, "base_amount": terms["base_price"],
             "reference": reference,
         })
 
@@ -116,7 +122,7 @@ class PaymentCallbackView(APIView):
             "voucher": voucher.username if reveal else None,
             "access_code": voucher.username if reveal else None,
             "code_revealed": reveal,
-            "plan": {field: voucher.service_terms[field] for field in ("name", "duration_hours", "data_limit")} if voucher else None,
+            "plan": {**{field: voucher.service_terms[field] for field in ("name", "duration_hours", "data_limit")}, "device_limit": voucher.service_terms.get("device_limit", voucher.device_limit)} if voucher else None,
             "tenant_name": transaction.tenant.name,
             "customer_email_masked": mask_email(transaction.customer_email),
         })

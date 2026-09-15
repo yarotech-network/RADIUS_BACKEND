@@ -23,7 +23,7 @@ def queue_credential_delivery(payment):
 
 def fulfill_verified_voucher(payment, verified):
     if (not isinstance(verified, dict) or verified.get("status") != "success" or verified.get("reference") != payment.reference
-            or verified.get("amount") != payment.amount or verified.get("currency") != "NGN"):
+            or type(verified.get("amount")) is not int or verified.get("amount") != payment.amount or verified.get("currency") != "NGN"):
         raise ValueError("Payment verification mismatch.")
     # Record paid evidence before fulfillment. Failed voucher issuance must
     # remain visible as paid_unfulfilled and recoverable, not a second charge.
@@ -33,6 +33,9 @@ def fulfill_verified_voucher(payment, verified):
         if not locked.voucher_id:
             if locked.plan_id is None:
                 raise ValueError("Payment plan is unavailable.")
+            if locked.purchased_terms is not None:
+                from apps.vouchers.terms import validate_reserved_price
+                validate_reserved_price(locked.purchased_terms)
             if locked.purchased_terms is not None and locked.purchased_terms.get('price') != locked.amount:
                 raise ValueError('Purchased amount mismatch.')
             locked.voucher = VoucherService.generate_vouchers(tenant=locked.tenant, plan_id=locked.plan_id, quantity=1, source="customer", purchased_terms=locked.purchased_terms)[0]

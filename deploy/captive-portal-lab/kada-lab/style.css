@@ -1,0 +1,170 @@
+a,body,div,form,html,img,input,label,p,span{margin:0;padding:0;border:0;font-family:sans-serif,Arial}body,html{min-height:100%;overflow-x:hidden}body{background:#a2a09b;background:-webkit-linear-gradient(315deg,hsla(236.6,0%,53.52%,1) 0,hsla(236.6,0%,53.52%,0) 70%),-webkit-linear-gradient(65deg,hsla(220.75,34.93%,26.52%,1) 10%,hsla(220.75,34.93%,26.52%,0) 80%),-webkit-linear-gradient(135deg,hsla(46.42,36.62%,83.92%,1) 15%,hsla(46.42,36.62%,83.92%,0) 80%),-webkit-linear-gradient(205deg,hsla(191.32,50.68%,56.45%,1) 100%,hsla(191.32,50.68%,56.45%,0) 70%);background:linear-gradient(135deg,hsla(236.6,0%,53.52%,1) 0,hsla(236.6,0%,53.52%,0) 70%),linear-gradient(25deg,hsla(220.75,34.93%,26.52%,1) 10%,hsla(220.75,34.93%,26.52%,0) 80%),linear-gradient(315deg,hsla(46.42,36.62%,83.92%,1) 15%,hsla(46.42,36.62%,83.92%,0) 80%),linear-gradient(245deg,hsla(191.32,50.68%,56.45%,1) 100%,hsla(191.32,50.68%,56.45%,0) 70%)}a{color:#486173}input,label{vertical-align:middle;white-space:normal;background:0 0;line-height:1}label{position:relative;display:block}p::first-letter{text-transform:uppercase}.main{min-height:calc(100vh - 90px);width:100%;display:-webkit-box;display:-ms-flexbox;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;-ms-flex-direction:column;flex-direction:column}.ie-fixMinHeight{display:-webkit-box;display:-ms-flexbox;display:flex}.ico{height:16px;position:absolute;top:0;left:0;margin-top:13px;margin-left:14px}.logo{max-width:200px;display:block;margin:0 auto 30px auto}.logo *{fill:#fff}.lite .logo *{fill:#444}h1{text-align:center;color:#fff;font-size:24px!important}*{-webkit-box-sizing:border-box;box-sizing:border-box;font-size:16px}.wrap{margin:auto;padding:40px;-webkit-transition:width .3s ease-in-out;transition:width .3s ease-in-out}@media only screen and (min-width:1px) and (max-width:575px){.wrap{width:100%}}form{width:100%;margin-bottom:20px}@-webkit-keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}.fadeIn{-webkit-animation-name:fadeIn;animation-name:fadeIn}.animated{-webkit-animation-duration:1s;animation-duration:1s;-webkit-animation-fill-mode:both;animation-fill-mode:both}.info{color:#fff;text-align:center;margin-bottom:30px}input{outline:0;-webkit-appearance:none;-moz-appearance:none;appearance:none}input:focus{outline:0}input[type=password],input[type=text]{width:100%;border:1px solid background-color: rgba(255,255,255,.8);height:44px;padding:3px 20px 3px 40px;margin-bottom:20px;border-radius:6px;background-color:rgba(255,255,255,.8);-webkit-transition:-webkit-box-shadow .3s ease-in-out;transition:-webkit-box-shadow .3s ease-in-out;transition:box-shadow .3s ease-in-out;transition:box-shadow .3s ease-in-out,-webkit-box-shadow .3s ease-in-out}input[type=password]:focus,input[type=text]:focus{-webkit-box-shadow:0 0 5px 0 rgba(255,255,255,1);box-shadow:0 0 5px 0 rgba(255,255,255,1)}.bt{opacity:.4}input[type=submit]{background:#3e4d59;color:#fff;border:0;cursor:pointer;text-align:center;width:100%;height:44px;border-radius:6px;-webkit-transition:background .3s ease-in-out;transition:background .3s ease-in-out}input[type=submit]:focus,input[type=submit]:hover{background:#33404a}table{border-collapse:collapse;width:100%;margin-bottom:20px}table td{color:#fff;border-bottom:1px solid #e6e6e6;padding:10px 4px 10px 0}table td:first-child{font-weight:700}.lite{background:#fff}.lite input[type=password],.lite input[type=text]{border:1px solid #c3c3c3}.lite .info,.lite h1,.lite table td{color:#444}.lite input[type=password]:focus,.lite input[type=text]:focus{-webkit-box-shadow:0 0 5px 0 rgba(62,77,89,.2);box-shadow:0 0 5px 0 rgba(62,77,89,.2)}.dark{background:#343434}.dark input[type=submit]{background:#dc3a41}.dark input[type=submit]:focus,.dark input[type=submit]:hover{background:#b92f35}.dark input[type=password],.dark input[type=text]{background-color:#fff}.dark a{color:#dc3a41}.dark table td{border-bottom:1px solid #505050}.info.alert{color:#da3d41}@media (min-width:576px){.wrap{width:410px}*{font-size:14px!important}}
+
+/* Yarotech login branding (scoped so other hotspot pages keep their design). */
+.yarotech-login{background:#000;color:#10233f}
+.yarotech-login:before,.yarotech-login:after{display:none}
+.yarotech-login .ie-fixMinHeight{min-height:100vh;position:relative;z-index:1}
+.yarotech-login .main{min-height:100vh;padding:24px 0}
+.yarotech-login .wrap{width:calc(100% - 32px);max-width:420px;padding:38px 36px 22px;margin:auto;background:linear-gradient(155deg,rgba(10,36,75,.98),rgba(3,18,43,.99));border:1px solid rgba(89,169,255,.2);border-radius:24px;box-shadow:0 28px 75px rgba(0,8,28,.58),inset 0 1px 0 rgba(255,255,255,.08)}
+.yarotech-login form{margin-bottom:18px}
+.yarotech-login .brand-mark{position:relative;width:96px;height:96px;padding:7px;margin:0 auto 16px;border-radius:24px;background:#020b19;box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 0 6px rgba(29,127,224,.14);animation:brandFloat 4s ease-in-out infinite;isolation:isolate}
+.yarotech-login .brand-mark:before{content:"";position:absolute;z-index:0;inset:-5px;border-radius:29px;background:conic-gradient(from 0deg,transparent 0 18%,#1598ff 31%,#60c8ff 39%,transparent 51% 100%);opacity:.85;animation:brandOrbit 5.5s linear infinite}
+.yarotech-login .brand-mark:after{content:"";position:absolute;z-index:2;inset:0;border-radius:24px;background:linear-gradient(115deg,transparent 25%,rgba(255,255,255,.2) 43%,transparent 60%);background-size:220% 100%;pointer-events:none;animation:brandShine 4.8s ease-in-out infinite}
+.yarotech-login .brand-logo{position:relative;z-index:1;display:block;width:100%;height:100%;border-radius:18px;object-fit:contain;animation:logoPulse 4s ease-in-out infinite}
+.yarotech-login .online-status{display:flex;align-items:center;justify-content:center;gap:6px;width:max-content;margin:0 auto 12px;padding:5px 11px;border:1px solid rgba(37,211,102,.28);border-radius:999px;background:rgba(37,211,102,.1);color:#42e88a;box-shadow:0 0 18px rgba(37,211,102,.08)}
+.yarotech-login .online-status svg{width:14px;height:14px;fill:#35df7a;filter:drop-shadow(0 0 5px rgba(53,223,122,.5))}
+.yarotech-login .online-status span{font-size:9px!important;font-weight:900;letter-spacing:1.4px}
+.yarotech-login .eyebrow{margin-bottom:8px;color:#087be6;text-align:center;font-size:11px!important;font-weight:800;letter-spacing:2.4px}
+.yarotech-login h1{max-width:320px;margin:0 auto 9px;color:#fff;background:none;-webkit-text-fill-color:#fff;font-size:25px!important;font-weight:800;line-height:1.2;letter-spacing:-.6px;text-shadow:0 8px 24px rgba(0,0,0,.3)}
+.yarotech-login .tagline{color:#a9bad0;text-align:center;margin-bottom:25px;line-height:1.5}
+.yarotech-login .info{padding:10px 12px;margin-bottom:18px;border-radius:10px;background:rgba(102,172,240,.1);color:#c3d2e4;line-height:1.45}
+.yarotech-login .info.alert{background:#fff0f0;color:#c62828}
+.yarotech-login label{margin-bottom:14px}
+.yarotech-login .ico{top:50%;width:17px;height:17px;margin:-8px 0 0 16px;filter:brightness(0) invert(1);opacity:.58}
+.yarotech-login input[type=password],.yarotech-login input[type=text]{height:52px;margin:0;padding:3px 18px 3px 46px;border:1px solid rgba(133,181,231,.22);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:15px!important}
+.yarotech-login input[type=password]::placeholder,.yarotech-login input[type=text]::placeholder{color:#8997a9}
+.yarotech-login input[type=password]:focus,.yarotech-login input[type=text]:focus{border-color:#339dff;background:rgba(255,255,255,.12);box-shadow:0 0 0 4px rgba(22,135,238,.16)}
+.yarotech-login input[type=submit]{height:52px;margin-top:3px;border-radius:12px;background:linear-gradient(135deg,#052757,#087be6);box-shadow:0 11px 25px rgba(5,75,155,.25);font-size:15px!important;font-weight:800;letter-spacing:.2px}
+.yarotech-login input[type=submit]:focus,.yarotech-login input[type=submit]:hover{background:linear-gradient(135deg,#041f49,#096dcc);box-shadow:0 9px 20px rgba(5,75,155,.34);transform:translateY(-1px)}
+.yarotech-login .account-links{display:flex;justify-content:space-between;gap:16px;margin-top:20px}
+.yarotech-login .account-links a{color:#0869bd;font-size:13px!important;font-weight:700;text-decoration:none}
+.yarotech-login .account-links a:hover{text-decoration:underline}
+.yarotech-login .account-links .purchase-code{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 13px;border:1px solid #65dcff;border-radius:10px;background:linear-gradient(135deg,#e8f9ff,#8bdcff);color:#031b3a;box-shadow:0 8px 20px rgba(47,181,238,.24);font-weight:900;text-decoration:none;overflow:hidden;animation:purchasePulse 2.2s ease-in-out infinite}
+.yarotech-login .account-links .purchase-code:after{content:"";position:absolute;top:-60%;left:-45%;width:28%;height:220%;background:rgba(255,255,255,.65);transform:rotate(22deg);animation:purchaseShine 3s ease-in-out infinite;pointer-events:none}
+.yarotech-login .account-links .purchase-code:hover{background:linear-gradient(135deg,#fff,#a9e8ff);box-shadow:0 10px 24px rgba(47,181,238,.34);text-decoration:none;transform:translateY(-1px)}
+.yarotech-login .account-links .purchase-code span{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#087be6;color:#fff;font-size:14px!important;font-weight:900;line-height:1}
+.yarotech-login .secure-note{margin-top:22px;color:#8693a5;text-align:center;font-size:11px!important}
+.yarotech-login .secure-note span{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-right:5px;border-radius:50%;background:#e9f8f0;color:#14945a;font-size:10px!important;font-weight:900}
+.yarotech-login .whatsapp-support{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:14px;padding:10px 12px;border:1px solid rgba(37,211,102,.22);border-radius:12px;background:rgba(37,211,102,.08);color:#dfffea;text-align:left;text-decoration:none;transition:background .25s ease,border-color .25s ease,transform .25s ease}
+.yarotech-login .whatsapp-support:hover{border-color:rgba(37,211,102,.5);background:rgba(37,211,102,.15);transform:translateY(-1px)}
+.yarotech-login .whatsapp-support svg{flex:0 0 25px;width:25px;height:25px;fill:#25d366;filter:drop-shadow(0 3px 7px rgba(37,211,102,.22))}
+.yarotech-login .whatsapp-support span{font-size:12px!important;font-weight:700;line-height:1.25}
+.yarotech-login .whatsapp-support small{display:block;color:#8fa8bf;font-size:9px!important;font-weight:600;letter-spacing:.8px;text-transform:uppercase}
+.yarotech-login .bt{margin:0;color:#9aa6b5;opacity:1;font-size:11px!important;letter-spacing:.2px}
+@media only screen and (max-width:575px){.yarotech-login .main{padding:16px 0}.yarotech-login .wrap{padding:30px 22px 20px;border-radius:20px}.yarotech-login .brand-mark{width:84px;height:84px;border-radius:21px}.yarotech-login h1{font-size:23px!important}.yarotech-login .account-links{gap:12px}}
+@media only screen and (max-height:680px){.yarotech-login .main{padding:10px 0}.yarotech-login .wrap{padding-top:22px}.yarotech-login .brand-mark{width:72px;height:72px;margin-bottom:11px}.yarotech-login .tagline{margin-bottom:16px}.yarotech-login .info{margin-bottom:13px}.yarotech-login .secure-note{margin-top:15px}}
+@keyframes brandFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes brandOrbit{to{transform:rotate(360deg)}}
+@keyframes brandShine{0%,45%{background-position:180% 0}70%,100%{background-position:-80% 0}}
+@keyframes logoPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(21,152,255,0))}50%{filter:drop-shadow(0 0 8px rgba(21,152,255,.55))}}
+@keyframes purchasePulse{0%,100%{transform:scale(1);box-shadow:0 8px 20px rgba(47,181,238,.24)}50%{transform:scale(1.045);box-shadow:0 9px 28px rgba(75,199,255,.48)}}
+@keyframes purchaseShine{0%,35%{left:-45%}65%,100%{left:125%}}
+@media (prefers-reduced-motion:reduce){.yarotech-login .brand-mark,.yarotech-login .brand-mark:before,.yarotech-login .brand-mark:after,.yarotech-login .brand-logo,.yarotech-login .purchase-code,.yarotech-login .purchase-code:after{animation:none}}
+
+/* Yarotech status, logout and redirect pages. */
+.yarotech-portal{background:#000;color:#fff}
+.yarotech-portal .main{min-height:100vh;padding:24px 0}
+.yarotech-portal .portal-card{width:calc(100% - 32px);max-width:440px;padding:32px;margin:auto;background:linear-gradient(155deg,#0a244b,#03122b);border:1px solid rgba(89,169,255,.2);border-radius:24px;box-shadow:0 28px 75px rgba(0,0,0,.65)}
+.yarotech-portal .portal-logo{display:block;width:76px;height:76px;padding:5px;margin:0 auto 10px;border-radius:19px;background:#020b19;object-fit:contain;box-shadow:0 0 0 5px rgba(29,127,224,.12)}
+.yarotech-portal .portal-brand{margin-bottom:18px;color:#3caaff;text-align:center;font-size:10px!important;font-weight:900;letter-spacing:2px}
+.yarotech-portal h1{margin-bottom:9px;color:#fff;font-size:24px!important;line-height:1.25}
+.yarotech-portal .portal-message{margin-bottom:20px;color:#9fb0c6;text-align:center;line-height:1.5}
+.yarotech-portal .portal-online{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;margin:0 auto 20px;padding:5px 12px;border-radius:999px;background:rgba(37,211,102,.1);color:#46e98c;font-size:10px!important;font-weight:800;text-transform:uppercase;letter-spacing:1px}
+.yarotech-portal .portal-online span{width:8px;height:8px;border-radius:50%;background:#35df7a;box-shadow:0 0 8px #35df7a}
+.yarotech-portal table{margin:0 0 20px;border:1px solid rgba(133,181,231,.14);border-radius:12px;background:rgba(255,255,255,.045);overflow:hidden}
+.yarotech-portal table td{padding:11px 13px;border-bottom:1px solid rgba(133,181,231,.12);color:#d9e6f4}
+.yarotech-portal table tr:last-child td{border-bottom:0}
+.yarotech-portal table td:first-child{color:#8fa8c2;font-weight:600}
+.yarotech-portal input[type=submit]{height:50px;border-radius:12px;background:linear-gradient(135deg,#052757,#087be6);box-shadow:0 10px 24px rgba(5,75,155,.25);font-weight:800}
+.yarotech-portal input[type=submit]:hover{background:linear-gradient(135deg,#07346f,#0a8cff)}
+.yarotech-portal .success-check{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:18px auto 16px;border-radius:50%;background:rgba(37,211,102,.12);color:#42e88a;box-shadow:0 0 0 6px rgba(37,211,102,.05);font-size:28px!important;font-weight:900}
+.yarotech-portal .info{margin:0;color:#8fa8c2}
+.yarotech-portal .info a{color:#49adff;font-weight:700}
+@media only screen and (max-width:575px){.yarotech-portal .main{padding:16px 0}.yarotech-portal .portal-card{padding:26px 20px;border-radius:20px}.yarotech-portal table td{padding:10px 9px;font-size:12px!important}}
+
+/* Modern Yarotech login layout. */
+.yarotech-login{background:radial-gradient(circle at 14% 18%,rgba(8,108,221,.2),transparent 34%),radial-gradient(circle at 88% 82%,rgba(31,166,255,.12),transparent 32%),#02050d}
+.yarotech-login .main{padding:30px 0}
+.yarotech-login .login-shell{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);width:calc(100% - 40px);max-width:940px;min-height:610px;padding:0;overflow:hidden;border:1px solid rgba(126,187,255,.18);border-radius:30px;background:rgba(4,17,39,.88);box-shadow:0 35px 100px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.yarotech-login .brand-panel{position:relative;display:flex;flex-direction:column;justify-content:space-between;min-height:610px;padding:48px;background:linear-gradient(145deg,rgba(8,60,128,.94),rgba(3,22,52,.96));overflow:hidden}
+.yarotech-login .brand-panel:before{content:"";position:absolute;width:380px;height:380px;top:-170px;right:-170px;border-radius:50%;background:radial-gradient(circle,rgba(51,174,255,.45),transparent 68%)}
+.yarotech-login .brand-panel:after{content:"";position:absolute;width:330px;height:330px;bottom:-180px;left:-130px;border:1px solid rgba(77,174,255,.22);border-radius:50%;box-shadow:0 0 0 50px rgba(31,133,230,.06),0 0 0 100px rgba(31,133,230,.035)}
+.yarotech-login .brand-panel-content,.yarotech-login .brand-footnote{position:relative;z-index:1}
+.yarotech-login .hero-logo{display:block;width:98px;height:98px;padding:7px;margin-bottom:35px;border-radius:25px;background:#020912;object-fit:contain;box-shadow:0 18px 45px rgba(0,0,0,.34),0 0 0 6px rgba(95,186,255,.12)}
+.yarotech-login .brand-kicker{margin-bottom:13px;color:#62c3ff;font-size:10px!important;font-weight:900;letter-spacing:2.5px}
+.yarotech-login .brand-panel h2{margin:0 0 18px;color:#fff;font-size:38px!important;font-weight:800;line-height:1.08;letter-spacing:-1.4px}
+.yarotech-login .brand-panel h2 span{color:#6fc9ff}
+.yarotech-login .brand-copy{max-width:365px;margin-bottom:27px;color:#b3c7df;font-size:14px!important;line-height:1.65}
+.yarotech-login .network-features{display:flex;flex-direction:column;gap:12px}
+.yarotech-login .network-features span{display:flex;align-items:center;gap:9px;color:#d7e7f8;font-size:12px!important;font-weight:650}
+.yarotech-login .network-features i{width:7px;height:7px;border-radius:50%;background:#47df91;box-shadow:0 0 10px rgba(71,223,145,.75)}
+.yarotech-login .brand-footnote{color:#7692b1;font-size:10px!important;letter-spacing:.7px}
+.yarotech-login .login-panel{display:flex;flex-direction:column;justify-content:center;padding:38px 44px;background:linear-gradient(155deg,rgba(7,27,61,.96),rgba(2,13,32,.98))}
+.yarotech-login .login-panel form{margin-bottom:16px}
+.yarotech-login .login-panel .brand-mark{width:82px;height:82px;margin-bottom:14px;border-radius:21px}
+.yarotech-login .login-panel .brand-mark:after{border-radius:21px}
+.yarotech-login .login-panel h1{font-size:25px!important}
+.yarotech-login .login-panel .tagline{margin-bottom:19px}
+.yarotech-login .login-panel .info{margin-bottom:15px;padding:9px 11px}
+.yarotech-login .login-panel input[type=password],.yarotech-login .login-panel input[type=text]{height:50px;border-radius:13px;background:rgba(255,255,255,.065)}
+.yarotech-login .login-panel input[type=submit]{height:50px;border-radius:13px;background:linear-gradient(110deg,#0756b5,#0b91f2)}
+.yarotech-login .login-panel .account-links{align-items:center;margin-top:17px}
+.yarotech-login .login-panel .secure-note{margin-top:17px}
+.yarotech-login .login-panel .whatsapp-support{margin-top:12px}
+.yarotech-login .login-panel .bt{margin:0}
+@media only screen and (max-width:800px){.yarotech-login .login-shell{display:block;max-width:430px;min-height:0}.yarotech-login .brand-panel{display:none}.yarotech-login .login-panel{padding:34px 32px 24px}}
+@media only screen and (max-width:575px){.yarotech-login .main{padding:14px 0}.yarotech-login .login-shell{width:calc(100% - 24px);border-radius:23px}.yarotech-login .login-panel{padding:28px 20px 20px}.yarotech-login .login-panel .brand-mark{width:76px;height:76px}.yarotech-login .login-panel h1{font-size:22px!important}}
+@media only screen and (max-height:720px) and (min-width:801px){.yarotech-login .main{padding:16px 0}.yarotech-login .login-shell,.yarotech-login .brand-panel{min-height:570px}.yarotech-login .brand-panel{padding:38px}.yarotech-login .hero-logo{width:82px;height:82px;margin-bottom:25px}.yarotech-login .brand-panel h2{font-size:33px!important}.yarotech-login .login-panel{padding-top:28px;padding-bottom:28px}}
+
+/* Off-white login theme. */
+.yarotech-login{background:radial-gradient(circle at 12% 15%,rgba(40,139,235,.12),transparent 32%),radial-gradient(circle at 90% 86%,rgba(62,181,255,.1),transparent 30%),#f4f7fb}
+.yarotech-login .login-shell{border-color:rgba(21,76,137,.14);background:#f9fbfe;box-shadow:0 30px 85px rgba(22,54,91,.2),inset 0 1px 0 #fff}
+.yarotech-login .login-panel{background:linear-gradient(155deg,#fff,#f1f5fa)}
+.yarotech-login .login-panel h1{color:#071d3b;-webkit-text-fill-color:#071d3b;text-shadow:none}
+.yarotech-login .login-panel .tagline{color:#687b93}
+.yarotech-login .login-panel .info{border:1px solid #dceaf7;background:#eef6fd;color:#526a84}
+.yarotech-login .login-panel .info.alert{border-color:#ffd0d0;background:#fff0f0;color:#bd2424}
+.yarotech-login .login-panel .ico{filter:none;opacity:.48}
+.yarotech-login .login-panel input[type=password],.yarotech-login .login-panel input[type=text]{border-color:#d5e0ec;background:#fff;color:#10233f;box-shadow:0 5px 16px rgba(18,54,90,.05)}
+.yarotech-login .login-panel input[type=password]::placeholder,.yarotech-login .login-panel input[type=text]::placeholder{color:#8494a7}
+.yarotech-login .login-panel input[type=password]:focus,.yarotech-login .login-panel input[type=text]:focus{border-color:#1687ee;background:#fff;box-shadow:0 0 0 4px rgba(22,135,238,.12)}
+.yarotech-login .login-panel .account-links>a:not(.purchase-code){color:#1267ad}
+.yarotech-login .login-panel .secure-note{color:#73869a}
+.yarotech-login .login-panel .whatsapp-support{border-color:rgba(24,167,81,.25);background:#edf9f2;color:#175f38}
+.yarotech-login .login-panel .whatsapp-support small{color:#6d8a79}
+.yarotech-login .login-panel .bt{color:#74869a}
+.yarotech-login .login-panel .code-field{margin-bottom:8px}
+.yarotech-login .login-panel .code-field input{padding-left:46px;text-align:left;font-weight:700;letter-spacing:.35px}
+.yarotech-login .login-panel .code-note{margin:0 0 14px;color:#6f8298;text-align:center;font-size:10px!important;line-height:1.4}
+
+/* Standard ISP captive-portal theme. */
+.yarotech-login{background:radial-gradient(circle at 50% -10%,rgba(16,111,219,.42),transparent 42%),linear-gradient(145deg,#020916 0%,#061a36 52%,#031126 100%)}
+.yarotech-login .main{padding:24px 0}
+.yarotech-login .login-shell{display:block;width:calc(100% - 28px);max-width:440px;min-height:0;padding:0;overflow:hidden;border:1px solid rgba(107,174,245,.24);border-radius:22px;background:#fff;box-shadow:0 28px 80px rgba(0,0,0,.52),0 0 0 1px rgba(255,255,255,.04)}
+.yarotech-login .brand-panel{display:none}
+.yarotech-login .login-panel{display:block;padding:34px 36px 24px;background:#fff}
+.yarotech-login .login-panel .brand-mark{width:88px;height:88px;margin-bottom:15px;border-radius:22px;box-shadow:0 12px 28px rgba(0,25,64,.18),0 0 0 5px #edf5fd}
+.yarotech-login .login-panel .brand-mark:before{opacity:.55}
+.yarotech-login .login-panel .brand-mark:after{border-radius:22px}
+.yarotech-login .login-panel h1{color:#071a35;-webkit-text-fill-color:#071a35;font-size:24px!important;letter-spacing:-.4px}
+.yarotech-login .login-panel .tagline{margin-bottom:19px;color:#64758a}
+.yarotech-login .login-panel .online-status{margin-bottom:11px;border-color:#caecd9;background:#effaf4;color:#178c51;box-shadow:none}
+.yarotech-login .login-panel .online-status svg{fill:#22a965;filter:none}
+.yarotech-login .login-panel .info{margin-bottom:15px;border:1px solid #dce9f5;border-radius:9px;background:#f2f7fc;color:#50677f}
+.yarotech-login .login-panel label{margin-bottom:8px}
+.yarotech-login .login-panel .ico{filter:none;opacity:.46}
+.yarotech-login .login-panel input[type=text]{height:52px;border:1px solid #cddae7;border-radius:9px;background:#fff;color:#10233f;box-shadow:inset 0 1px 2px rgba(8,35,66,.04)}
+.yarotech-login .login-panel input[type=text]:focus{border-color:#087be6;background:#fff;box-shadow:0 0 0 3px rgba(8,123,230,.13)}
+.yarotech-login .login-panel .code-note{margin-bottom:15px;color:#6a7b8d}
+.yarotech-login .login-panel input[type=submit]{height:52px;margin-top:0;border-radius:9px;background:#075eb8;box-shadow:0 8px 18px rgba(7,94,184,.23);font-size:14px!important;text-transform:uppercase;letter-spacing:.75px}
+.yarotech-login .login-panel input[type=submit]:hover,.yarotech-login .login-panel input[type=submit]:focus{background:#064f9c;box-shadow:0 9px 20px rgba(7,94,184,.3);transform:none}
+.yarotech-login .login-panel .account-links{margin-top:17px;padding-top:16px;border-top:1px solid #e2eaf2}
+.yarotech-login .login-panel .account-links>a:not(.purchase-code){color:#1a5f9c}
+.yarotech-login .login-panel .account-links .purchase-code{border-color:#b8dcf5;background:#eaf6ff;color:#073968;box-shadow:none}
+.yarotech-login .login-panel .account-links .purchase-code:hover{background:#dff1ff;box-shadow:none}
+.yarotech-login .login-panel .secure-note{margin-top:16px;color:#738396}
+.yarotech-login .login-panel .whatsapp-support{margin-top:12px;border-color:#cfe8d9;border-radius:9px;background:#f0faf4;color:#17633a}
+.yarotech-login .login-panel .bt{color:#7b8998}
+@media only screen and (max-width:575px){.yarotech-login .main{padding:12px 0}.yarotech-login .login-shell{width:calc(100% - 20px);border-radius:18px}.yarotech-login .login-panel{padding:27px 20px 20px}.yarotech-login .login-panel .brand-mark{width:78px;height:78px}.yarotech-login .login-panel h1{font-size:21px!important}.yarotech-login .login-panel .account-links{gap:10px}}
+
+/* White and blue ISP palette. */
+.yarotech-login{background:radial-gradient(circle at 15% 10%,rgba(122,211,255,.42),transparent 30%),radial-gradient(circle at 88% 90%,rgba(0,71,170,.28),transparent 34%),linear-gradient(145deg,#0877cf,#064a9b)}
+.yarotech-login .login-shell{border-color:rgba(255,255,255,.48);background:#fff;box-shadow:0 28px 75px rgba(1,38,88,.38),0 0 0 1px rgba(255,255,255,.14)}
+.yarotech-login .login-panel{background:#fff}
+.yarotech-login .login-panel input[type=submit]{background:linear-gradient(110deg,#075cad,#078ee1)}
+.yarotech-login .login-panel input[type=submit]:hover,.yarotech-login .login-panel input[type=submit]:focus{background:linear-gradient(110deg,#064d94,#087bc3)}
+.yarotech-login .login-panel .account-links .purchase-code{border-color:#a9d7f6;background:#e9f6ff;color:#064378}
+.yarotech-login .login-panel .info{border-color:#d3e7f8;background:#f0f8ff}
+.yarotech-login .login-panel .account-links .forgot-code{color:#d62828;font-weight:800}
+.yarotech-login .login-panel .account-links .forgot-code:hover{color:#aa1515}
+.powered-credit{margin:16px 0 0!important;color:#7e8fa2!important;text-align:center;font-size:10px!important;font-weight:700;letter-spacing:.35px}

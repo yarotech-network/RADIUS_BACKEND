@@ -1,3 +1,5 @@
+from apps.subscriptions.test_support import grant_test_subscription
+from apps.vouchers.radius_test_support import RadiusTablesMixin
 import hashlib
 import hmac
 import json
@@ -20,11 +22,12 @@ from .models import PaymentDelivery, PaystackWebhookEvent
 User = get_user_model()
 
 
-class PaystackWebhookTests(APITestCase):
+class PaystackWebhookTests(RadiusTablesMixin, APITestCase):
     secret = "tenant-paystack-secret"
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant)
         TenantSetting.objects.create(
             tenant=self.tenant,
             paystack_secret_key=self.secret,
@@ -236,6 +239,7 @@ class PaystackWebhookTests(APITestCase):
 class PaymentPublicApiTests(APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant)
         TenantSetting.objects.create(
             tenant=self.tenant,
             paystack_secret_key="tenant-paystack-secret",
@@ -340,7 +344,7 @@ class PaymentPublicApiTests(APITestCase):
         self.assertEqual(body["voucher"], "ABCDEFGH")
         self.assertEqual(body["access_code"], "ABCDEFGH")
         self.assertTrue(body["code_revealed"])
-        self.assertEqual(body["plan"], {"name": "Standard", "duration_hours": 24, "data_limit": 0})
+        self.assertEqual(body["plan"], {"name": "Standard", "duration_hours": 24, "data_limit": 0, "device_limit": 1})
         self.assertEqual(body["tenant_name"], "Tenant A")
         self.assertEqual(body["customer_email_masked"], "b\u2022\u2022\u2022@example.com")
         self.assertNotIn("buyer@example.com", json.dumps(body))

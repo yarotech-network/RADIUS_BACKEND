@@ -1,10 +1,12 @@
+from apps.subscriptions.test_support import grant_test_subscription
+from apps.vouchers.radius_test_support import RadiusTablesMixin
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import close_old_connections
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -23,7 +25,7 @@ from .services import AgentService
 User = get_user_model()
 
 
-class AgentFixtureMixin:
+class AgentFixtureMixin(RadiusTablesMixin):
     def create_agent(self, username="agent", status_value="active", balance=100_000):
         user = User.objects.create_user(
             username=username,
@@ -43,6 +45,7 @@ class AgentFixtureMixin:
 class AgentApiTests(AgentFixtureMixin, APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant)
         TenantSetting.objects.create(tenant=self.tenant, max_funding_amount=100_000)
         self.user, self.agent, self.wallet = self.create_agent()
 
@@ -126,6 +129,7 @@ class AgentApiTests(AgentFixtureMixin, APITestCase):
 class AgentWalletServiceTests(AgentFixtureMixin, APITestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant)
         self.user, self.agent, self.wallet = self.create_agent()
         self.plan = InternetPlan.objects.create(
             tenant=self.tenant,
@@ -142,10 +146,10 @@ class AgentWalletServiceTests(AgentFixtureMixin, APITestCase):
         )
 
         self.wallet.refresh_from_db()
-        self.assertEqual(self.wallet.balance, 40_000)
+        self.assertEqual(self.wallet.balance, 46_000)
         self.assertEqual(len(vouchers), 1)
         self.assertEqual(len(allocations), 1)
-        self.assertEqual(allocations[0].amount_charged, 60_000)
+        self.assertEqual(allocations[0].amount_charged, 54_000)
 
     @patch("apps.vouchers.services.Radcheck.objects.create", side_effect=RuntimeError("radius unavailable"))
     def test_radius_failure_rolls_back_wallet_voucher_and_allocation(self, radius_create):
@@ -164,8 +168,8 @@ class AgentWalletServiceTests(AgentFixtureMixin, APITestCase):
             reference="funding-1",
         )
 
-        first = AgentService.complete_wallet_funding(payment)
-        second = AgentService.complete_wallet_funding(payment)
+        first = AgentService.complete_wallet_funding(payment, {"status": "success", "reference": payment.reference, "amount": payment.amount, "currency": "NGN"})
+        second = AgentService.complete_wallet_funding(payment, {"status": "success", "reference": payment.reference, "amount": payment.amount, "currency": "NGN"})
 
         self.wallet.refresh_from_db()
         payment.refresh_from_db()
@@ -176,11 +180,13 @@ class AgentWalletServiceTests(AgentFixtureMixin, APITestCase):
         self.assertIsNotNone(payment.completed_at)
 
 
+@skipUnlessDBFeature("has_select_for_update")
 class AgentWalletConcurrencyTests(AgentFixtureMixin, TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        grant_test_subscription(self.tenant)
         self.user, self.agent, self.wallet = self.create_agent(balance=100_000)
         self.plan = InternetPlan.objects.create(
             tenant=self.tenant,
@@ -211,7 +217,7 @@ class AgentWalletConcurrencyTests(AgentFixtureMixin, TransactionTestCase):
 
         self.wallet.refresh_from_db()
         self.assertCountEqual(results, ["success", "insufficient"])
-        self.assertEqual(self.wallet.balance, 0)
+        self.assertEqual(self.wallet.balance, 10_000)
         self.assertEqual(Voucher.objects.count(), 1)
         self.assertEqual(AgentVoucherAllocation.objects.count(), 1)
 
@@ -227,7 +233,7 @@ class AgentWalletConcurrencyTests(AgentFixtureMixin, TransactionTestCase):
             close_old_connections()
             current = AgentWalletFundingPayment.objects.get(pk=payment.pk)
             barrier.wait(timeout=5)
-            result = AgentService.complete_wallet_funding(current)
+            result = AgentService.complete_wallet_funding(current, {"status": "success", "reference": current.reference, "amount": current.amount, "currency": "NGN"})
             close_old_connections()
             return result
 

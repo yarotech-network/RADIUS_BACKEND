@@ -15,69 +15,85 @@ class VoucherService:
     def write_radius_credentials(voucher):
         Radcheck.objects.create(username=voucher.username, attribute="Cleartext-Password", op=":=", value=voucher.password)
         terms = voucher.service_terms
-        Radcheck.objects.create(username=voucher.username, attribute="Max-Days", op=":=", value=str(terms['duration_hours'] * 3600))
-        # Explicit opt-in: preserve existing legacy vouchers and custom-rate issuance.
-        if voucher.purchased_terms is not None:
-            snapshot = terms['radius_rate_limit']
-        else:
-            profile = voucher.plan.bandwidth_profile
-            snapshot = voucher.plan.rate_limit if profile and profile.rate_limit == voucher.plan.rate_limit else ""
+        Radcheck.objects.create(username=voucher.username, attribute="Max-Days", op=":=", value=str(terms['duration_seconds']))
+        snapshot = terms.get('radius_rate_limit', voucher.rate_limit_snapshot)
         if snapshot:
             Radreply.objects.filter(username=voucher.username, attribute="Mikrotik-Rate-Limit").delete()
             Radreply.objects.create(username=voucher.username, attribute="Mikrotik-Rate-Limit", op=":=", value=snapshot)
         voucher.rate_limit_snapshot = snapshot
-        voucher.save(update_fields=["rate_limit_snapshot"])
+        voucher.issued_duration_seconds = terms['duration_seconds']
+        if voucher.purchased_terms is None:
+            voucher.purchased_terms = terms
+        voucher.save(update_fields=["rate_limit_snapshot", "issued_duration_seconds", "purchased_terms"])
+        Radcheck.objects.create(username=voucher.username, attribute='Simultaneous-Use', op=':=', value=str(terms['device_limit']))
         if terms['data_limit'] > 0:
             Radcheck.objects.create(username=voucher.username, attribute="Max-Total-Octets", op=":=", value=str(terms['data_limit'] * 1024 * 1024))
 
     @staticmethod
     @transaction.atomic
-    def generate_vouchers(tenant, plan_id, quantity, prefix="", agent=None, source="admin", purchased_terms=None):
+    def generate_vouchers(tenant, plan_id, quantity, prefix="", agent=None, source="admin", purchased_terms=None, device_limit=1):
         """Generate vouchers and create RADIUS radcheck rows."""
         if type(quantity) is not int or not 1 <= quantity <= 100:
             raise ValueError("Quantity must be an integer between 1 and 100.")
         if not tenant.is_active or (agent is not None and agent.tenant_id != tenant.pk):
             raise ValueError("Invalid tenant or agent scope.")
-        query = InternetPlan.objects.filter(id=plan_id, tenant=tenant)
+        query = InternetPlan.objects.select_for_update().filter(id=plan_id, tenant=tenant)
         if purchased_terms is None:
-            query = query.filter(is_active=True)
+            from apps.subscriptions.access import require_tenant_access
+            require_tenant_access(tenant)
+            query = query.filter(is_active=True, archived_at__isnull=True, plan_type='voucher')
+            if source == 'agent':
+                query = query.filter(agent_enabled=True)
         elif (source != 'customer' or quantity != 1 or purchased_terms.get('plan_id') != plan_id
               or purchased_terms.get('tenant_id') != tenant.pk):
             raise ValueError('Invalid purchased plan scope.')
         plan = query.get()
+        if purchased_terms is not None:
+            device_limit = purchased_terms.get('device_limit', device_limit)
+        if type(device_limit) is not int or not 1 <= device_limit <= 10:
+            raise ValueError('Device limit must be between 1 and 10.')
+        from django.db import IntegrityError
+        from django.db.models.functions import Lower
+        from django.core.exceptions import ValidationError
+        from .code_formats import identity_exists
+        from .terms import snapshot_plan
+        if purchased_terms is not None:
+            code_format = purchased_terms.get('voucher_code_format', 'legacy')
+            prefix = purchased_terms.get('voucher_prefix', prefix)
+            terms = purchased_terms
+        else:
+            prefix = prefix or plan.voucher_prefix
+            terms = snapshot_plan(plan, device_limit)
+            code_format = terms["voucher_code_format"]
+            terms['voucher_prefix'] = prefix
         vouchers = []
-
         for _ in range(quantity):
-            username, password = Voucher.generate_credentials(prefix)
-
-            # Ensure unique username
-            while Voucher.objects.filter(username=username).exists():
-                username, password = Voucher.generate_credentials(prefix)
-
-            voucher = Voucher.objects.create(
-                username=username,
-                password=password,
-                plan=plan,
-                tenant=tenant,
-                agent=agent,
-                generation_source=source,
-                device_limit=1,
-                purchased_terms=purchased_terms,
-            )
-
-            VoucherService.write_radius_credentials(voucher)
-
-            vouchers.append(voucher)
+            for attempt in range(100):
+                username, password = Voucher.generate_credentials(prefix, code_format)
+                if identity_exists(username):
+                    continue
+                try:
+                    with transaction.atomic():
+                        voucher = Voucher.objects.create(username=username, password=password,
+                            plan=plan, tenant=tenant, agent=agent, generation_source=source,
+                            device_limit=device_limit, purchased_terms=terms)
+                except IntegrityError:
+                    if Voucher.objects.annotate(identity=Lower("username")).filter(identity=username.lower()).exists():
+                        continue
+                    raise
+                VoucherService.write_radius_credentials(voucher)
+                vouchers.append(voucher)
+                break
+            else:
+                raise ValidationError('Could not reserve a unique voucher code. Retry the request.')
 
         return vouchers
 
     @staticmethod
-    def activate_voucher(voucher):
-        """Called by FreeRADIUS post-auth to activate voucher."""
-        if voucher.status == "unused":
-            voucher.activate()
-            return True
-        return False
+    def activate_voucher(voucher, *, credential_verified=False, nas_ip_address='', mac_address=''):
+        """Trusted server-side post-auth only; never take verification from request data."""
+        return voucher.activate(credential_verified=credential_verified,
+            nas_ip_address=nas_ip_address, mac_address=mac_address)
 
     @staticmethod
     @transaction.atomic
@@ -85,7 +101,7 @@ class VoucherService:
         """Expire vouchers past their expiration time."""
         now = timezone.now()
         expired = Voucher.objects.filter(
-            status="active",
+            status__in=["active", "used", "sold", "unused"],
             expires_at__lte=now,
         )
         usernames = list(expired.values_list("username", flat=True))

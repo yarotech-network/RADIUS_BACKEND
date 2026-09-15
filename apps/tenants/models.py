@@ -4,8 +4,9 @@ from django.conf import settings
 
 class Tenant(models.Model):
     name = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True)
-    phone = models.CharField(max_length=20, blank=True)
+    business_name = models.CharField(max_length=150, blank=True, default="", db_default="")
+    slug = models.SlugField(max_length=120, unique=True)
+    phone = models.CharField(max_length=30, blank=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
@@ -30,6 +31,7 @@ class TenantMembership(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="membership")
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="memberships")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="staff")
+    is_active = models.BooleanField(default=True, db_default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -46,7 +48,10 @@ class TenantSetting(models.Model):
     paystack_public_key = models.CharField(max_length=255, blank=True)
     agent_commission_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10.0)
     voucher_prefix = models.CharField(max_length=10, blank=True)
+    default_voucher_code_format = models.CharField(max_length=20, choices=[("legacy", "Readable mixed (existing)"), ("numeric", "Numbers only"), ("alphabetic", "Letters only"), ("alphanumeric", "Letters and numbers")], default="legacy")
     max_funding_amount = models.PositiveIntegerField(default=100000)  # in kobo
+    agent_funding_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, db_default=0)
+    agent_funding_flat_fee = models.PositiveIntegerField(default=0, db_default=0)  # kobo
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

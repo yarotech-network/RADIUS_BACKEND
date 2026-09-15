@@ -81,11 +81,11 @@ class EntitlementTests(Fixtures, APITestCase):
         with patch("apps.subscriptions.entitlements.timezone.now", return_value=end+timedelta(seconds=1)):
             self.assertEqual(entitlement_terms(self.tenant)["max_routers"], 4)
 
-    def test_router_cap_counts_inactive_and_expired_subscription_blocks_creation(self):
+    def test_router_cap_counts_active_and_expired_subscription_blocks_creation(self):
         response = self.client.post("/api/v1/routers/", {"name": "First", "ip_address": "10.0.0.1", "nas_secret": "test-secret", "is_active": False}, format="json")
         self.assertEqual(response.status_code, 201, response.data)
         response = self.client.post("/api/v1/routers/", {"name": "Second", "ip_address": "10.0.0.2", "nas_secret": "test-secret"}, format="json")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 201)
         self.sub.expires_at = timezone.now()-timedelta(seconds=1)
         self.sub.save()
         self.assertEqual(self.client.get("/api/v1/routers/").status_code, 200)
@@ -143,7 +143,7 @@ class EntitlementTests(Fixtures, APITestCase):
         period = SubscriptionPeriod.objects.get(tenant=self.tenant)
         period.terms = {**period.terms, "max_routers": 0, "daily_voucher_print_limit": 0}
         period.save()
-        self.assertEqual(self.client.post("/api/v1/routers/", {"name": "Denied", "ip_address": "10.0.0.9", "nas_secret": "test-secret"}).status_code, 403)
+        self.assertEqual(self.client.post("/api/v1/routers/", {"name": "Denied", "ip_address": "10.0.0.9", "nas_secret": "test-secret", "is_active":True}).status_code, 403)
         with self.assertRaises(PermissionDenied):
             authorize_print(self.tenant, [self.vouchers[0].pk])
         period.terms = {**period.terms, "max_routers": None, "daily_voucher_print_limit": None}
@@ -187,10 +187,10 @@ class EntitlementTests(Fixtures, APITestCase):
         with patch("apps.subscriptions.entitlements.timezone.now", return_value=future.period.starts_at + timedelta(seconds=1)):
             self.assertEqual(entitlement_terms(self.tenant)["max_routers"], 2)
 
-    def test_legacy_without_subscription_keeps_access(self):
+    def test_legacy_without_subscription_requires_reconciliation(self):
         other = Tenant.objects.create(name="Legacy", slug="legacy")
-        self.assertIsNone(entitlement_terms(other)["max_routers"])
-        self.assertTrue(entitlement_terms(other)["whatsapp_enabled"])
+        with self.assertRaises(PermissionDenied):
+            entitlement_terms(other)
 
 
 class ConcurrentLimitTests(Fixtures, TransactionTestCase):
@@ -229,3 +229,22 @@ class ConcurrentLimitTests(Fixtures, TransactionTestCase):
             outcomes = list(pool.map(run, [1, 2]))
         self.assertEqual(sorted(outcomes), [201, 403])
         self.assertEqual(NASDevice.objects.filter(tenant=self.tenant).count(), 1)
+
+
+    def test_two_router_reactivations_cannot_exceed_cap(self):
+        routers = [NASDevice.objects.create(tenant=self.tenant, name=f'Inactive {i}',
+            ip_address=f'192.0.2.{i}', is_active=False) for i in (1, 2)]
+        barrier = Barrier(2)
+        def run(pk):
+            close_old_connections()
+            try:
+                client = APIClient()
+                client.force_authenticate(get_user_model().objects.get(pk=self.owner.pk))
+                barrier.wait(timeout=10)
+                return client.patch(f'/api/v1/routers/{pk}/', {'is_active':True}, format='json').status_code
+            finally:
+                close_old_connections()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(run, [router.pk for router in routers]))
+        self.assertEqual(sorted(outcomes), [200, 403])
+        self.assertEqual(NASDevice.objects.filter(tenant=self.tenant, is_active=True).count(), 1)

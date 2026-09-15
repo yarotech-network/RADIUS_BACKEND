@@ -84,6 +84,8 @@ class RouterApiAndStateTests(APITestCase):
         cache.clear()
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        from apps.subscriptions.test_support import grant_test_subscription
+        grant_test_subscription(self.tenant_a)
         self.manager = User.objects.create_user(
             username="manager", email="manager@example.com", password="StrongPass-4821"
         )

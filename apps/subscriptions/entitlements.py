@@ -22,9 +22,13 @@ def current_period(tenant):
 
 
 def entitlement_terms(tenant):
+    if not tenant.is_active:
+        raise PermissionDenied("This workspace is inactive.")
     subscription = TenantSubscription.objects.select_related("plan").filter(tenant=tenant).first()
     if subscription is None:
-        return {"max_routers": None, "daily_voucher_print_limit": None, "whatsapp_enabled": True}
+        if tenant.is_platform_admin and tenant.is_active:
+            return {"max_routers": None, "daily_voucher_print_limit": None, "whatsapp_enabled": True}
+        raise PermissionDenied("An active subscription is required. Open billing to subscribe or reconcile missing subscription records.")
     if not subscription.is_active:
         raise PermissionDenied("Your subscription has expired. Renew it to use this feature.")
     period = current_period(tenant)
@@ -34,12 +38,16 @@ def entitlement_terms(tenant):
     return snapshot_plan(subscription.plan)
 
 
-def require_router_slot(tenant):
+def router_usage(tenant):
     from apps.routers.models import NASDevice
+    return NASDevice.objects.filter(tenant=tenant, is_active=True).count()
+
+
+def require_router_slot(tenant, *, consumes_slot=True):
     terms = entitlement_terms(tenant)
     limit = terms.get("max_routers")
-    if limit is not None and NASDevice.objects.filter(tenant=tenant).count() >= limit:
-        raise PermissionDenied("Your plan's router limit has been reached. Upgrade your subscription or remove a router.")
+    if consumes_slot and limit is not None and router_usage(tenant) >= limit:
+        raise PermissionDenied("Your plan's router limit has been reached. Upgrade your subscription or deactivate a router.")
 
 
 def whatsapp_allowed(tenant):
