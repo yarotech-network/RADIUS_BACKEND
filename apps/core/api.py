@@ -12,6 +12,7 @@ def assigned_tenant(request, view=None):
         "VoucherViewSet": {"list": "vouchers.print", "retrieve": "vouchers.print", "print": "vouchers.print", "pdf": "vouchers.print", "authorize_print": "vouchers.print", "generate": "vouchers.generate"},
         "InternetPlanViewSet": {"list": "vouchers.generate", "retrieve": "vouchers.generate"},
         "PaymentTransactionViewSet": {"list": "payments.view", "retrieve": "payments.view"},
+        "NetworkSummaryView": {"get": "live_sessions.view"},
         "LiveUsersView": {"get": "live_sessions.view"},
         "DisconnectSessionView": {"post": "live_sessions.disconnect"},
         "PaymentRecoveryViewSet": {"list": "payments.view", "retrieve": "payments.view", "retry": "payments.support", "deliver": "payments.support"},

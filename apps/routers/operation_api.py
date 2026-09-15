@@ -68,6 +68,8 @@ class RouterOperationActions:
         router = self.get_object()
         with transaction.atomic():
             router = NASDevice.objects.select_for_update().get(pk=router.pk)
+            if hasattr(router, 'registration') and serializer.validated_data['action'] == 'provision':
+                return Response({'error': 'Use Retry preparation on the setup-script page for this router.'}, status=409)
             if router.deployment_status == "deploying" or RouterOperation.objects.filter(router=router, status__in=["pending", "running"]).exists():
                 return Response({"error": "A router operation is already pending."}, status=409)
             if not router.wireguard_public_key or (serializer.validated_data["action"] == "provision" and (not router.is_active or not router.wireguard_ip)):
@@ -93,6 +95,8 @@ class RouterOperationActions:
         router = self.get_object()
         with transaction.atomic():
             router = NASDevice.objects.select_for_update().get(pk=router.pk)
+            if hasattr(router, 'registration') and 'nas_secret' in values:
+                return Response({'error': 'Generated RADIUS credentials require coordinated script and NAS rotation.'}, status=409)
             if router.updated_at != expected:
                 return Response({"error": "Router changed; reload before replacing secrets."}, status=409)
             if router.deployment_status == "deploying" or router.operations.filter(status__in=["pending", "running"]).exists():

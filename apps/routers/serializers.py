@@ -10,6 +10,12 @@ from .provisioners import (
 
 
 class NASDeviceSerializer(serializers.ModelSerializer):
+    registration = serializers.SerializerMethodField()
+
+    def get_registration(self, obj):
+        from .registration_api import registration_summary
+        return registration_summary(obj)
+
     nas_secret = serializers.CharField(max_length=255, write_only=True, trim_whitespace=False)
     routeros_password_encrypted = serializers.CharField(max_length=255, write_only=True, required=False, allow_blank=True, trim_whitespace=False)
     wireguard_port = serializers.IntegerField(min_value=1, max_value=65535, required=False)
@@ -24,7 +30,7 @@ class NASDeviceSerializer(serializers.ModelSerializer):
             "wireguard_public_key", "wireguard_port", "routeros_username",
             "routeros_password_encrypted", "location", "tenant", "tenant_name",
             "onboarding_state", "deployment_status", "is_active",
-            "last_seen_at", "created_at", "updated_at",
+            "last_seen_at", "created_at", "updated_at", "registration",
         ]
         read_only_fields = ["id", "tenant", "onboarding_state", "deployment_status", "last_seen_at", "created_at", "updated_at"]
         extra_kwargs = {

@@ -271,6 +271,7 @@ class Radacct(models.Model):
     nasipaddress = models.GenericIPAddressField()
     nasportid = models.CharField(max_length=32, null=True)
     acctstarttime = models.DateTimeField(null=True)
+    acctupdatetime = models.DateTimeField(null=True, blank=True)
     acctstoptime = models.DateTimeField(null=True)
     acctinputoctets = models.BigIntegerField(default=0)
     acctoutputoctets = models.BigIntegerField(default=0)

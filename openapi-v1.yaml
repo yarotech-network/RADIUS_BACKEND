@@ -4,6 +4,50 @@ info:
   version: 1.0.0
   description: Multi-tenant RADIUS hotspot management API
 paths:
+  /api/v1/dashboard/network/:
+    get:
+      operationId: api_v1_dashboard_network_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkSummary'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkUnavailable'
+          description: ''
+        '400':
+          description: API error; existing v1 fields are retained alongside problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: API error; existing v1 fields are retained alongside problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: API error; existing v1 fields are retained alongside problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: API error; existing v1 fields are retained alongside problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/v1/agent/dashboard/:
     get:
       operationId: api_v1_agent_dashboard_retrieve
@@ -8763,9 +8807,164 @@ components:
       - status
       - tenant
       - token
+    NetworkSummary:
+      type: object
+      properties:
+        rate_sampled_sessions:
+          type: integer
+        online_users:
+          type: integer
+        online_vouchers:
+          type: integer
+        stale_sessions:
+          type: integer
+        sessions_today:
+          type: integer
+        live_upload_bytes:
+          type: integer
+        live_download_bytes:
+          type: integer
+        live_traffic_bytes:
+          type: integer
+        today_upload_bytes:
+          type: integer
+        today_download_bytes:
+          type: integer
+        today_traffic_bytes:
+          type: integer
+        all_time_upload_bytes:
+          type: integer
+        all_time_download_bytes:
+          type: integer
+        all_time_traffic_bytes:
+          type: integer
+        upload_bytes_per_second:
+          type: integer
+          nullable: true
+        download_bytes_per_second:
+          type: integer
+          nullable: true
+        latest_accounting_at:
+          type: string
+          format: date-time
+          nullable: true
+        router_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        routers:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkRouter'
+        routers_total:
+          type: integer
+        observed_at:
+          type: string
+          format: date-time
+        freshness_seconds:
+          type: integer
+        traffic_basis:
+          type: string
+        source:
+          type: string
+      required:
+      - all_time_download_bytes
+      - all_time_traffic_bytes
+      - all_time_upload_bytes
+      - download_bytes_per_second
+      - freshness_seconds
+      - latest_accounting_at
+      - live_download_bytes
+      - live_traffic_bytes
+      - live_upload_bytes
+      - observed_at
+      - online_users
+      - online_vouchers
+      - rate_sampled_sessions
+      - router_counts
+      - routers
+      - routers_total
+      - sessions_today
+      - source
+      - stale_sessions
+      - today_download_bytes
+      - today_traffic_bytes
+      - today_upload_bytes
+      - traffic_basis
+      - upload_bytes_per_second
+    NetworkRouter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/NetworkRouterStatusEnum'
+        online_users:
+          type: integer
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - id
+      - last_seen_at
+      - name
+      - online_users
+      - status
+    NetworkRouterStatusEnum:
+      enum:
+      - online
+      - offline
+      - unknown
+      - awaiting_import
+      - inactive
+      type: string
+      description: '* `online` - online
+
+        * `offline` - offline
+
+        * `unknown` - unknown
+
+        * `awaiting_import` - awaiting_import
+
+        * `inactive` - inactive'
+    NetworkUnavailable:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     DashboardStats:
       type: object
       properties:
+        collected_revenue:
+          type: object
+          additionalProperties:
+            type: integer
+        revenue_sources:
+          type: object
+          additionalProperties:
+            type: integer
+        voucher_usage:
+          type: object
+          additionalProperties:
+            type: integer
+        vouchers_issued_today:
+          type: integer
+        successful_payments:
+          type: integer
+        failed_payments:
+          type: integer
+        active_plans:
+          type: integer
+        total_plans:
+          type: integer
+        reporting_timezone:
+          type: string
         total_vouchers:
           type: integer
         active_vouchers:
@@ -8790,17 +8989,26 @@ components:
         paid_unfulfilled_payments:
           type: integer
       required:
+      - active_plans
       - active_routers
       - active_vouchers
       - amount_unit
+      - collected_revenue
       - currency
+      - failed_payments
       - observed_at
       - paid_unfulfilled_payments
       - pending_payments
+      - reporting_timezone
+      - revenue_sources
+      - successful_payments
       - total_agents
+      - total_plans
       - total_revenue
       - total_routers
       - total_vouchers
+      - voucher_usage
+      - vouchers_issued_today
     DeliveryRequest:
       type: object
       properties:

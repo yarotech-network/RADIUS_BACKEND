@@ -8,9 +8,15 @@ Use `backend.test-shop.env.example` for this topology. It allows the shop API ho
 
 The earlier `stage-radius.yarotech.com.ng` example and combined SPA/API Nginx template do not describe this deployment. Do not install their Nginx/TLS instructions for these domains. Previously built archives still contain the earlier example; select this configuration explicitly when preparing a new package.
 
-Before changing Nginx, inspect the existing shop and test site configurations and current listeners. Earlier server output showed shop already enabled, so its availability is not established. Do not overwrite its server block or certificates. Prepare the exact Nginx change after confirming which application it serves and whether its API locations are in use.
+## Confirmed VPS routing and prepared additions
 
-For direct cross-origin frontend requests, build with `VITE_API_BASE_URL=https://shop.yarotech.com.ng/api/v1`. The existing `/api/v1` build instead needs an explicit API proxy in the test frontend's Nginx site; it does not start calling shop automatically. Choose the wiring after reading the deployed site configurations. No frontend rebuild or VPS change has been performed for this domain clarification.
+The supplied Nginx configuration serves ecommerce from `/var/www/yarotech_ecommerce/dist/client` on shop and the RADIUS React frontend from `/var/www/test.yarotech.com.ng/yarotech-radius-frontend/dist` on test. Both have HTTPS certificates. Gunicorn already occupies 8000 and 8001; 8020 was absent from the supplied listener output. Recheck it immediately before starting a service.
+
+Preserve both existing SPA configurations. `test-shop-api.locations.conf` is a candidate include for their existing HTTPS server blocks: only `/api/v1/` goes to the new isolated backend on 127.0.0.1:8020, while private RADIUS endpoints remain externally blocked. Shop's homepage/assets continue serving ecommerce. Test's `/api/v1/` uses the same backend, so the frontend build configured with `/api/v1` does not need a cross-origin rebuild. The proxy fixes the backend Host header to shop; its existing ALLOWED_HOSTS setting therefore covers either entrypoint.
+
+The supplied configs have no API proxy locations. Reinspect before activation to catch intervening changes or additional includes. Prepare a timestamped backup of each resolved config, add the candidate include only after backend health checks pass, run `nginx -t`, and reload only when validation succeeds. No Nginx change has been executed here. Existing certificate and port80 redirect blocks need no replacement.
+
+The latest locally verified backend revision is `cb4e361` on `email-verification-landing`. The VPS pull fetched that remote revision, but its `Already up to date` message alone does not establish which branch/commit is checked out. Verify the VPS branch, working-tree state and staging files before installing. Do not reset or force-switch a working tree with local changes.
 
 Read-only VPS inspection:
 

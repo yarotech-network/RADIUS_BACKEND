@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 import uuid
 from .operation_models import RouterOperation  # noqa: F401
+from .registration_models import RouterRegistration  # noqa: F401
 
 
 class NASDevice(models.Model):

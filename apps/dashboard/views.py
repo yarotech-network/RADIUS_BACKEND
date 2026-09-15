@@ -3,18 +3,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import NotFound
-from django.db.models import Count, Sum
 from django.db.models import Q
 from django.utils import timezone
-from datetime import timedelta
 from .serializers import (
     DashboardStatsSerializer,
+    NetworkSummarySerializer,
     DisconnectSessionResponseSerializer,
     LiveUsersResponseSerializer,
 )
-from apps.vouchers.models import Voucher, PaymentTransaction
 from apps.routers.models import NASDevice, RouterAuditEvent
-from apps.agents.models import AgentProfile
 from apps.core.permissions import IsTenantManager
 from apps.routers.radius_client import RadiusError
 from apps.routers.secret_store import secret_store
@@ -23,31 +20,31 @@ from apps.core.commands import idempotent
 from rest_framework.exceptions import ValidationError
 from django.core.exceptions import ValidationError as ModelValidationError
 from apps.routers.selectors import tenant_radius_addresses
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 
 class DashboardStatsView(APIView):
     serializer_class = DashboardStatsSerializer
     def get(self, request):
-        tenant = tenant_for(request)
-        today = timezone.now().date()
-        month_start = today.replace(day=1)
+        from .metrics import business_metrics
+        return Response(business_metrics(tenant_for(request)))
 
-        return Response({
-            "total_vouchers": Voucher.objects.filter(tenant=tenant).count(),
-            "active_vouchers": Voucher.objects.filter(tenant=tenant, status="active").count(),
-            "total_revenue": PaymentTransaction.objects.filter(
-                tenant=tenant, status="success"
-            ).aggregate(total=Sum("amount"))["total"] or 0,
-            "total_agents": AgentProfile.objects.filter(tenant=tenant).count(),
-            "total_routers": NASDevice.objects.filter(tenant=tenant).count(),
-            "active_routers": NASDevice.objects.filter(
-                tenant=tenant, onboarding_state="active"
-            ).count(),
-            "currency": "NGN",
-            "amount_unit": "kobo",
-            "observed_at": timezone.now(),
-            "pending_payments": PaymentTransaction.objects.filter(tenant=tenant, status="pending").count(),
-            "paid_unfulfilled_payments": PaymentTransaction.objects.filter(tenant=tenant, verified_at__isnull=False, voucher__isnull=True).filter(iot_purchase__fulfilled_at__isnull=True).count(),
-        })
+
+class NetworkSummaryView(APIView):
+    serializer_class = NetworkSummarySerializer
+
+    @extend_schema(auth=[{'jwtAuth': []}], responses={
+        200: NetworkSummarySerializer,
+        503: inline_serializer(name='NetworkUnavailable', fields={'detail': serializers.CharField()}),
+    })
+    def get(self, request):
+        from .network import network_metrics
+        from django.db import DatabaseError
+        try:
+            data = network_metrics(tenant_for(request))
+        except DatabaseError:
+            return Response({'detail': 'Accounting statistics are temporarily unavailable.'}, status=503)
+        return Response(data, headers={'Cache-Control': 'no-store'})
 
 
 class LiveUsersView(APIView):
@@ -58,10 +55,11 @@ class LiveUsersView(APIView):
 
         tenant = tenant_for(request)
         router_ips = tenant_radius_addresses(tenant)
+        from .network import fresh_condition
         sessions = Radacct.objects.filter(
             nasipaddress__in=router_ips,
             acctstoptime__isnull=True,
-        ).order_by("-radacctid")
+        ).filter(fresh_condition(timezone.now())).order_by("-radacctid")
         if request.query_params.get("username"):
             sessions = sessions.filter(username__icontains=request.query_params["username"])
         if request.query_params.get("router"):

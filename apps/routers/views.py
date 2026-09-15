@@ -25,6 +25,7 @@ from apps.core.commands import idempotent
 from apps.core.mixins import AuditedCrudMixin
 from rest_framework.exceptions import ValidationError
 from django.utils import timezone
+from .registration_api import RouterRegistrationActions
 
 
 class RouterBusy(APIException):
@@ -32,7 +33,7 @@ class RouterBusy(APIException):
     default_detail = "A provisioning operation is pending; wait for its result before editing the router."
 
 
-class NASDeviceViewSet(HotspotSetupActions, RouterOperationActions, AuditedCrudMixin, viewsets.ModelViewSet):
+class NASDeviceViewSet(RouterRegistrationActions, HotspotSetupActions, RouterOperationActions, AuditedCrudMixin, viewsets.ModelViewSet):
     filterset_fields = ["is_active", "onboarding_state", "deployment_status"]
     search_fields = ["name", "ip_address", "location"]
     serializer_class = NASDeviceSerializer
@@ -46,7 +47,7 @@ class NASDeviceViewSet(HotspotSetupActions, RouterOperationActions, AuditedCrudM
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return NASDevice.objects.none()
-        return NASDevice.objects.filter(tenant=tenant_for(self.request))
+        return NASDevice.objects.filter(tenant=tenant_for(self.request)).select_related('registration')
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -63,6 +64,10 @@ class NASDeviceViewSet(HotspotSetupActions, RouterOperationActions, AuditedCrudM
             serializer.save(tenant=tenant)
 
     def perform_update(self, serializer):
+        if hasattr(serializer.instance, 'registration') and any(field in serializer.validated_data for field in (
+            'ip_address', 'wireguard_ip', 'wireguard_public_key', 'wireguard_port', 'nas_secret',
+        )):
+            raise ValidationError('The generated router identity cannot be edited through the manual setup form.')
         if any(field in serializer.validated_data for field in ("nas_secret", "routeros_password_encrypted")):
             raise ValidationError("Use replace-secrets with your current password and the router version.")
         with transaction.atomic():
