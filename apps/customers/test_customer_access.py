@@ -120,3 +120,32 @@ class CustomerAccessTests(DeviceAccessTests):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(self.client.get('/api/v1/vouchers/?status=invalid').status_code, 400)
+
+    def test_sold_is_purchase_history_across_lifecycle(self):
+        self.purchase()
+        for state in ('unused', 'sold', 'active', 'used', 'expired', 'disabled'):
+            with self.subTest(state=state):
+                self.a.status = state
+                self.a.save()
+                for endpoint in ('vouchers', 'customer-access'):
+                    response = self.client.get(f'/api/v1/{endpoint}/?status=sold')
+                    self.assertEqual(response.status_code, 200, response.data)
+                    self.assertEqual([r['id'] for r in response.data['results']], [self.a.pk])
+                    self.assertEqual(response.data['results'][0]['status'], state)
+        self.a.refresh_from_db()
+        self.assertEqual(self.a.status, 'disabled')
+
+    def test_sold_excludes_incomplete_failed_and_cross_tenant_payments(self):
+        payment = self.purchase(status='pending')
+        for status in ('pending', 'failed', 'abandoned'):
+            payment.status = status
+            payment.save()
+            self.assertEqual(self.client.get('/api/v1/vouchers/?status=sold').data['count'], 0)
+        payment.status = 'success'
+        payment.tenant = self.other
+        payment.save()
+        self.assertEqual(self.client.get('/api/v1/vouchers/?status=sold').data['count'], 0)
+        # Activation alone is not a sale; explicitly imported sold state remains visible.
+        self.b.status = 'sold'
+        self.b.save()
+        self.assertEqual(self.client.get('/api/v1/vouchers/?status=sold').data['count'], 1)

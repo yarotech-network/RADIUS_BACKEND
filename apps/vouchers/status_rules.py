@@ -27,6 +27,11 @@ def classify(query, tenant, now=None):
 
 
 def filter_status(query, value):
+    if value == 'sold':
+        # Purchase history is independent of current access validity. Retain
+        # explicitly recorded legacy sales without inferring a sale from use.
+        return query.filter(Q(status='sold') | Q(
+            payment__status='success', payment__tenant_id=F('tenant_id')))
     if value == 'used':
         return query.filter(Q(is_used=True) | Q(status__in=['active', 'used']) |
             Q(activated_at__isnull=False) | Q(first_used_at__isnull=False) |

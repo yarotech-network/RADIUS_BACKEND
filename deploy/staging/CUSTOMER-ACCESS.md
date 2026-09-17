@@ -47,3 +47,5 @@ Restore the previous frontend then backend release; disable the added timer with
 - N/A: schema migration; no models changed.
 - NOT VERIFIED: VPS accounting diagnosis, staging timer installation, PostgreSQL behavior/query plans at production volume, browser/physical-router end-to-end acceptance.
 - Production readiness: NOT READY until those staging checks pass. Local implementation is ready for staging validation.
+
+Sold is a purchase-history filter: successful same-tenant voucher payments remain included after use, expiry or disabling. Explicit legacy sold records are retained. Pending/failed purchases, free issuance, and activation alone do not establish a sale. The returned status remains the current effective code status.
