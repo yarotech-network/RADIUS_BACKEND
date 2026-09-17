@@ -4,7 +4,7 @@ from .models import Voucher, PaymentTransaction
 
 
 class VoucherFilter(django_filters.FilterSet):
-    status = django_filters.CharFilter(field_name="status")
+    status = django_filters.ChoiceFilter(choices=Voucher.STATUS_CHOICES, method="filter_status")
     plan = django_filters.NumberFilter(field_name="plan_id")
     agent = django_filters.NumberFilter(field_name="agent_id")
     search = django_filters.CharFilter(method="filter_search")
@@ -14,6 +14,10 @@ class VoucherFilter(django_filters.FilterSet):
     class Meta:
         model = Voucher
         fields = ["status", "plan", "agent", "search"]
+
+    def filter_status(self, queryset, name, value):
+        from .status_rules import filter_status
+        return filter_status(queryset, value)
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(

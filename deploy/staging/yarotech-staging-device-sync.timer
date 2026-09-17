@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh staging customer device history every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Unit=yarotech-staging-device-sync.service
+
+[Install]
+WantedBy=timers.target

@@ -61,7 +61,15 @@ class VoucherViewSet(AuditedCrudMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Voucher.objects.none()
-        return Voucher.objects.filter(tenant=tenant_for(self.request), deleted_at__isnull=True).select_related("plan", "tenant", "agent__user").order_by("-created_at", "-id")
+        from .status_rules import classify
+        tenant = tenant_for(self.request)
+        return classify(Voucher.objects.filter(tenant=tenant, deleted_at__isnull=True), tenant).select_related("plan", "tenant", "agent__user").order_by("-created_at", "-id")
+
+    def filter_queryset(self, queryset):
+        query = super().filter_queryset(queryset)
+        if query.query.order_by:
+            query = query.order_by(*[("-" if field.startswith("-") else "") + "effective_status" if field.lstrip("-") == "status" else field for field in query.query.order_by])
+        return query
 
     def get_permissions(self):
         if self.action in ["list", "retrieve", "print", "pdf", "authorize_print"]:

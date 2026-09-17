@@ -89,6 +89,12 @@ class InternetPlanSerializer(serializers.ModelSerializer):
 
 
 class VoucherSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+
+    def get_status(self, instance):
+        from .status_rules import effective_status
+        return effective_status(instance)
+
     can_edit = serializers.SerializerMethodField()
 
     def get_can_edit(self, voucher):

@@ -49,7 +49,10 @@ def sync_device_access():
         stop = aware(row.acctstoptime) if row.acctstoptime else None
         if start > now or (stop and stop < start):
             continue
-        seen = min(now, max(start, stop or start + timedelta(seconds=max(0, row.acctsessiontime or 0))))
+        updated = aware(row.acctupdatetime) if row.acctupdatetime else start + timedelta(seconds=max(0, row.acctsessiontime or 0))
+        if updated > now:
+            continue
+        seen = min(now, max(start, stop or updated))
         key = hashlib.sha256(f"{voucher.pk}|{row.nasipaddress}|{row.sessionid}|{start.isoformat()}".encode()).hexdigest()
         defaults = dict(tenant_id=voucher.tenant_id, voucher_id=voucher.pk, mac_address=mac,
             router_name=routers[0].name, nas_address=row.nasipaddress, started_at=start,

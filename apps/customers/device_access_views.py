@@ -14,6 +14,7 @@ from .models import DeviceAccessSession, DeviceAccessSync
 
 
 class DeviceFilterSerializer(serializers.Serializer):
+    voucher = serializers.IntegerField(required=False, min_value=1)
     period = serializers.ChoiceField(choices=["all", "today", "week", "month", "custom"], default="all")
     activity = serializers.ChoiceField(choices=["all", "online", "offline", "unknown"], default="all")
     search = serializers.CharField(max_length=64, required=False, allow_blank=True)
@@ -66,6 +67,8 @@ class CustomerDeviceViewSet(viewsets.GenericViewSet):
         state = DeviceAccessSync.objects.filter(pk=1).first()
         fresh = bool(state and state.completed_at and state.completed_at >= now - timedelta(minutes=2))
         base = DeviceAccessSession.objects.filter(tenant=tenant, voucher__tenant=tenant)
+        if filters.get("voucher"):
+            base = base.filter(voucher_id=filters["voucher"])
         recent = Q(stopped_at__isnull=True, last_seen_at__gte=now - timedelta(minutes=5))
         if not fresh:
             recent &= Q(pk__isnull=True)
